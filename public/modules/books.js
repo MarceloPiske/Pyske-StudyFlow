@@ -11,12 +11,23 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
 
 export class BooksModule {
-  constructor() {
+  constructor(db, user) {
+    this.db = db;
+    this.user = user;
     this.books = [];
+    this.dataLoaded = false;
+    this.relatedTopics = [];
   }
 
-  async render(user) {
-    await this.loadBooks(user);
+  async ensureDataLoaded() {
+    if (!this.dataLoaded) {
+      await this.loadBooks();
+    }
+  }
+
+  async render(topicsData = []) {
+    this.relatedTopics = topicsData;
+    await this.ensureDataLoaded();
 
     return `
       <div class="books-container">
@@ -95,6 +106,18 @@ export class BooksModule {
                 </div>
 
                 <div class="form-group">
+                  <label class="form-label">Resenha Pessoal</label>
+                  <textarea id="book-review" class="form-input" rows="3" placeholder="Suas impressões sobre o livro..."></textarea>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Tópicos Relacionados</label>
+                  <div class="topics-selector" id="book-topics-selector">
+                    ${this.renderTopicsCheckboxes()}
+                  </div>
+                </div>
+
+                <div class="form-group">
                   <label class="form-label">URL da Capa</label>
                   <input type="url" id="book-cover" class="form-input">
                 </div>
@@ -111,11 +134,11 @@ export class BooksModule {
     `;
   }
 
-  async loadBooks(user) {
+  async loadBooks() {
     try {
       const booksQuery = query(
-        collection(window.db, 'books'),
-        where('userId', '==', user.uid),
+        collection(this.db, 'books'),
+        where('userId', '==', this.user.uid),
         orderBy('createdAt', 'desc')
       );
       const snapshot = await getDocs(booksQuery);
@@ -124,9 +147,16 @@ export class BooksModule {
       snapshot.forEach(doc => {
         this.books.push({ id: doc.id, ...doc.data() });
       });
+      
+      this.dataLoaded = true;
+      console.log('Books loaded:', this.books);
     } catch (error) {
       console.error('Error loading books:', error);
     }
+  }
+
+  getTopicById(topicId) {
+    return this.relatedTopics?.find(t => t.id === topicId);
   }
 
   renderBooks(filter = 'all') {
@@ -172,13 +202,37 @@ export class BooksModule {
             </div>
           ` : ''}
 
+          ${book.relatedTopicIds && book.relatedTopicIds.length ? `
+            <div class="book-topics">
+              <span class="topics-label">Tópicos:</span>
+              ${book.relatedTopicIds.map(topicId => {
+                const topic = this.getTopicById(topicId);
+                return topic ? `<span class="topic-tag" data-topic-id="${topicId}">${topic.name}</span>` : '';
+              }).filter(Boolean).join('')}
+            </div>
+          ` : ''}
+
           <div class="book-actions">
             <button class="btn-edit" data-book-id="${book.id}">Editar</button>
             <button class="btn-delete" data-book-id="${book.id}">Excluir</button>
+            <button class="btn-study" data-book-id="${book.id}" data-book-title="${book.title}">Estudar</button>
           </div>
         </div>
       </div>
     `;
+  }
+
+  renderTopicsCheckboxes() {
+    if (!this.relatedTopics?.length) {
+      return '<p class="empty-state">Crie alguns tópicos primeiro para relacioná-los aos livros.</p>';
+    }
+
+    return this.relatedTopics.map(topic => `
+      <label class="topic-checkbox">
+        <input type="checkbox" value="${topic.id}" data-topic-name="${topic.name}">
+        <span>${topic.name}</span>
+      </label>
+    `).join('');
   }
 
   init() {
@@ -238,6 +292,13 @@ export class BooksModule {
       } else if (e.target.classList.contains('btn-delete')) {
         const bookId = e.target.dataset.bookId;
         this.deleteBook(bookId);
+      } else if (e.target.classList.contains('btn-study')) {
+        const bookId = e.target.dataset.bookId;
+        const bookTitle = e.target.dataset.bookTitle;
+        this.startStudySession(bookId, bookTitle);
+      } else if (e.target.classList.contains('topic-tag')) {
+        const topicId = e.target.dataset.topicId;
+        window.app.navigateToSection('topics', { highlightTopic: topicId });
       }
     });
   }
@@ -290,6 +351,13 @@ export class BooksModule {
     const currentPage = parseInt(document.getElementById('book-current-page').value) || 0;
     const totalPages = parseInt(document.getElementById('book-total-pages').value) || 0;
     const coverUrl = document.getElementById('book-cover').value.trim();
+    const review = document.getElementById('book-review').value.trim();
+
+    // Get selected topics
+    const selectedTopics = [];
+    document.querySelectorAll('#book-topics-selector input[type="checkbox"]:checked').forEach(checkbox => {
+      selectedTopics.push(checkbox.value);
+    });
 
     if (!title || !author) return;
 
@@ -301,18 +369,22 @@ export class BooksModule {
         currentPage,
         totalPages,
         coverUrl,
+        review,
+        relatedTopicIds: selectedTopics,
         rating: this.selectedRating || null,
-        userId: window.auth.currentUser.uid
+        userId: this.user.uid
       };
 
       if (bookId) {
-        await updateDoc(doc(window.db, 'books', bookId), bookData);
+        await updateDoc(doc(this.db, 'books', bookId), bookData);
       } else {
         bookData.createdAt = new Date();
-        await addDoc(collection(window.db, 'books'), bookData);
+        await addDoc(collection(this.db, 'books'), bookData);
       }
 
       this.hideModal();
+      // Mark data as stale and reload
+      this.dataLoaded = false;
       window.app.navigateToSection('books');
     } catch (error) {
       console.error('Error saving book:', error);
@@ -330,6 +402,12 @@ export class BooksModule {
     document.getElementById('book-current-page').value = book.currentPage || 0;
     document.getElementById('book-total-pages').value = book.totalPages || 0;
     document.getElementById('book-cover').value = book.coverUrl || '';
+    document.getElementById('book-review').value = book.review || '';
+
+    // Set selected topics
+    document.querySelectorAll('#book-topics-selector input[type="checkbox"]').forEach(checkbox => {
+      checkbox.checked = book.relatedTopicIds?.includes(checkbox.value) || false;
+    });
 
     if (book.rating) {
       this.setRating(book.rating);
@@ -342,11 +420,26 @@ export class BooksModule {
     if (!confirm('Tem certeza que deseja excluir este livro?')) return;
 
     try {
-      await deleteDoc(doc(window.db, 'books', bookId));
+      await deleteDoc(doc(this.db, 'books', bookId));
       window.app.navigateToSection('books');
     } catch (error) {
       console.error('Error deleting book:', error);
     }
+  }
+
+  startStudySession(bookId, bookTitle) {
+    const book = this.books.find(b => b.id === bookId);
+    if (book && book.relatedTopicIds && book.relatedTopicIds.length > 0) {
+      const primaryTopicId = book.relatedTopicIds[0];
+      const topic = this.relatedTopics.find(t => t.id === primaryTopicId);
+      if (topic) {
+        window.app.timer.start(primaryTopicId, topic.name, bookId);
+        return;
+      }
+    }
+    
+    // If no related topics, start a generic study session
+    window.app.timer.start(null, `Lendo: ${bookTitle}`, bookId);
   }
 
   clearForm() {
@@ -355,6 +448,10 @@ export class BooksModule {
     this.selectedRating = null;
     document.querySelectorAll('#book-rating .star').forEach(star => {
       star.style.opacity = '0.3';
+    });
+    // Clear topic selections
+    document.querySelectorAll('#book-topics-selector input[type="checkbox"]').forEach(checkbox => {
+      checkbox.checked = false;
     });
   }
 }

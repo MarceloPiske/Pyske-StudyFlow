@@ -4,19 +4,23 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
 
 export class TimerModule {
-  constructor() {
+  constructor(db, user) {
+    this.db = db;
+    this.user = user;
     this.isRunning = false;
     this.isPaused = false;
     this.startTime = null;
     this.pausedTime = 0;
     this.currentTopic = null;
+    this.currentBook = null;
     this.interval = null;
   }
 
-  start(topicId, topicName) {
+  start(topicId, topicName, bookId = null) {
     if (this.isRunning && !this.isPaused) return;
 
     this.currentTopic = { id: topicId, name: topicName };
+    this.currentBook = bookId ? { id: bookId } : null;
     this.isRunning = true;
     this.isPaused = false;
 
@@ -78,6 +82,7 @@ export class TimerModule {
     this.startTime = null;
     this.pausedTime = 0;
     this.currentTopic = null;
+    this.currentBook = null;
     this.stopCounter();
   }
 
@@ -128,18 +133,19 @@ export class TimerModule {
 
   async saveSession(durationInSeconds, notes) {
     try {
-      const user = window.auth.currentUser;
-      if (!user) return;
+      if (!this.user) return;
 
-      await addDoc(collection(window.db, 'studySessions'), {
-        userId: user.uid,
-        topicId: this.currentTopic.id,
-        topicName: this.currentTopic.name,
+      const sessionData = {
+        userId: this.user.uid,
+        topicId: this.currentTopic?.id || null,
+        topicName: this.currentTopic?.name || null,
+        bookId: this.currentBook?.id || null,
         durationInSeconds,
         notes: notes.trim(),
         createdAt: new Date()
-      });
+      };
 
+      await addDoc(collection(this.db, 'studySessions'), sessionData);
       console.log('Study session saved successfully');
     } catch (error) {
       console.error('Error saving study session:', error);

@@ -1,5 +1,3 @@
-
-
 import { 
   collection, 
   doc, 
@@ -64,6 +62,16 @@ export class NotesModule {
                   <input type="text" id="note-title" class="form-input" placeholder="Título da anotação" required>
                 </div>
 
+                <div class="form-group">
+                  <label class="form-label">Tipo de Anotação</label>
+                  <select id="note-type" class="form-input">
+                    <option value="internal_note">Nota Interna</option>
+                    <option value="google_doc">Link do Google Docs</option>
+                    <option value="drive_link">Link do Google Drive</option>
+                    <option value="external_link">Link Externo</option>
+                  </select>
+                </div>
+
                 <div class="form-row">
                   <div class="form-group">
                     <label class="form-label">Tópico</label>
@@ -81,9 +89,9 @@ export class NotesModule {
                   </div>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" id="content-group">
                   <label class="form-label">Conteúdo</label>
-                  <div class="editor-toolbar">
+                  <div class="editor-toolbar" id="editor-toolbar">
                     <button type="button" class="btn-tool" data-command="bold"><b>B</b></button>
                     <button type="button" class="btn-tool" data-command="italic"><i>I</i></button>
                     <button type="button" class="btn-tool" data-command="underline"><u>U</u></button>
@@ -96,6 +104,12 @@ export class NotesModule {
                     contenteditable="true" 
                     placeholder="Escreva sua anotação aqui..."
                   ></div>
+                  <input 
+                    type="url" 
+                    id="note-link" 
+                    class="form-input hidden" 
+                    placeholder="Cole o link aqui..."
+                  >
                 </div>
 
                 <div class="form-group">
@@ -179,16 +193,17 @@ export class NotesModule {
       <div class="note-item" data-note-id="${note.id}">
         <div class="note-header">
           <h4 class="note-title">${note.title}</h4>
+          <div class="note-type-badge ${note.type}">${this.getTypeBadge(note.type)}</div>
           <div class="note-actions">
             <button class="btn-edit" data-note-id="${note.id}">✏️</button>
             <button class="btn-delete" data-note-id="${note.id}">🗑️</button>
           </div>
         </div>
         <div class="note-meta">
-          ${note.topicName ? `<span class="note-topic">📚 ${note.topicName}</span>` : ''}
-          ${note.bookTitle ? `<span class="note-book">📖 ${note.bookTitle}</span>` : ''}
+          ${note.topicName ? `<span class="note-topic clickable" data-topic-id="${note.topicId}">📚 ${note.topicName}</span>` : ''}
+          ${note.bookTitle ? `<span class="note-book clickable" data-book-id="${note.bookId}">📖 ${note.bookTitle}</span>` : ''}
         </div>
-        <div class="note-preview">${this.getTextPreview(note.content)}</div>
+        <div class="note-preview">${this.getContentPreview(note)}</div>
         ${note.tags ? `
           <div class="note-tags">
             ${note.tags.split(',').map(tag => `<span class="tag">${tag.trim()}</span>`).join('')}
@@ -197,6 +212,27 @@ export class NotesModule {
         <div class="note-date">${this.formatDate(note.createdAt?.toDate())}</div>
       </div>
     `).join('');
+  }
+
+  getTypeBadge(type) {
+    const badges = {
+      'internal_note': '📝 Nota',
+      'google_doc': '📄 Google Docs',
+      'drive_link': '💾 Drive',
+      'external_link': '🔗 Link'
+    };
+    return badges[type] || '📝';
+  }
+
+  getContentPreview(note) {
+    if (note.type === 'internal_note') {
+      const temp = document.createElement('div');
+      temp.innerHTML = note.content || '';
+      const text = temp.textContent || temp.innerText || '';
+      return text.length > 150 ? text.substring(0, 150) + '...' : text;
+    } else {
+      return `<a href="${note.content}" target="_blank" rel="noopener noreferrer">${note.content}</a>`;
+    }
   }
 
   renderTopicOptions() {
@@ -209,13 +245,6 @@ export class NotesModule {
     return this.books.map(book => 
       `<option value="${book.id}">${book.title} - ${book.author}</option>`
     ).join('');
-  }
-
-  getTextPreview(htmlContent) {
-    const temp = document.createElement('div');
-    temp.innerHTML = htmlContent || '';
-    const text = temp.textContent || temp.innerText || '';
-    return text.length > 150 ? text.substring(0, 150) + '...' : text;
   }
 
   formatDate(date) {
@@ -237,6 +266,11 @@ export class NotesModule {
     // Add note button
     document.getElementById('add-note-btn')?.addEventListener('click', () => {
       this.clearForm();
+    });
+
+    // Note type change
+    document.getElementById('note-type')?.addEventListener('change', (e) => {
+      this.toggleContentInput(e.target.value);
     });
 
     // Form submission
@@ -280,8 +314,35 @@ export class NotesModule {
       } else if (e.target.closest('.note-item')) {
         const noteId = e.target.closest('.note-item').dataset.noteId;
         this.selectNote(noteId);
+      } else if (e.target.classList.contains('clickable')) {
+        if (e.target.dataset.topicId) {
+          window.app.navigateToSection('topics', { highlightTopic: e.target.dataset.topicId });
+        } else if (e.target.dataset.bookId) {
+          window.app.navigateToSection('books', { highlightBook: e.target.dataset.bookId });
+        }
       }
     });
+  }
+
+  toggleContentInput(type) {
+    const contentGroup = document.getElementById('content-group');
+    const editor = document.getElementById('note-content');
+    const linkInput = document.getElementById('note-link');
+    const toolbar = document.getElementById('editor-toolbar');
+
+    if (type === 'internal_note') {
+      editor.classList.remove('hidden');
+      linkInput.classList.add('hidden');
+      toolbar.classList.remove('hidden');
+      linkInput.required = false;
+      editor.setAttribute('contenteditable', 'true');
+    } else {
+      editor.classList.add('hidden');
+      linkInput.classList.remove('hidden');
+      toolbar.classList.add('hidden');
+      linkInput.required = true;
+      editor.setAttribute('contenteditable', 'false');
+    }
   }
 
   filterNotes(searchTerm) {
@@ -299,10 +360,17 @@ export class NotesModule {
   async handleFormSubmit() {
     const noteId = document.getElementById('note-id').value;
     const title = document.getElementById('note-title').value.trim();
-    const content = document.getElementById('note-content').innerHTML;
+    const type = document.getElementById('note-type').value;
     const topicId = document.getElementById('note-topic').value;
     const bookId = document.getElementById('note-book').value;
     const tags = document.getElementById('note-tags').value.trim();
+
+    let content;
+    if (type === 'internal_note') {
+      content = document.getElementById('note-content').innerHTML;
+    } else {
+      content = document.getElementById('note-link').value.trim();
+    }
 
     if (!title || !content) return;
 
@@ -312,6 +380,7 @@ export class NotesModule {
 
       const noteData = {
         title,
+        type,
         content,
         topicId: topicId || null,
         topicName: selectedTopic?.name || null,
@@ -355,10 +424,18 @@ export class NotesModule {
 
     document.getElementById('note-id').value = note.id;
     document.getElementById('note-title').value = note.title;
-    document.getElementById('note-content').innerHTML = note.content;
+    document.getElementById('note-type').value = note.type || 'internal_note';
     document.getElementById('note-topic').value = note.topicId || '';
     document.getElementById('note-book').value = note.bookId || '';
     document.getElementById('note-tags').value = note.tags || '';
+
+    this.toggleContentInput(note.type || 'internal_note');
+
+    if (note.type === 'internal_note') {
+      document.getElementById('note-content').innerHTML = note.content;
+    } else {
+      document.getElementById('note-link').value = note.content;
+    }
   }
 
   async deleteNote(noteId) {
@@ -376,6 +453,8 @@ export class NotesModule {
     document.getElementById('note-form').reset();
     document.getElementById('note-id').value = '';
     document.getElementById('note-content').innerHTML = '';
+    document.getElementById('note-link').value = '';
+    this.toggleContentInput('internal_note');
 
     // Clear selection
     document.querySelectorAll('.note-item').forEach(item => {
@@ -388,16 +467,17 @@ export class NotesModule {
       <div class="note-item" data-note-id="${note.id}">
         <div class="note-header">
           <h4 class="note-title">${note.title}</h4>
+          <div class="note-type-badge ${note.type}">${this.getTypeBadge(note.type)}</div>
           <div class="note-actions">
             <button class="btn-edit" data-note-id="${note.id}">✏️</button>
             <button class="btn-delete" data-note-id="${note.id}">🗑️</button>
           </div>
         </div>
         <div class="note-meta">
-          ${note.topicName ? `<span class="note-topic">📚 ${note.topicName}</span>` : ''}
-          ${note.bookTitle ? `<span class="note-book">📖 ${note.bookTitle}</span>` : ''}
+          ${note.topicName ? `<span class="note-topic clickable" data-topic-id="${note.topicId}">📚 ${note.topicName}</span>` : ''}
+          ${note.bookTitle ? `<span class="note-book clickable" data-book-id="${note.bookId}">📖 ${note.bookTitle}</span>` : ''}
         </div>
-        <div class="note-preview">${this.getTextPreview(note.content)}</div>
+        <div class="note-preview">${this.getContentPreview(note)}</div>
         ${note.tags ? `
           <div class="note-tags">
             ${note.tags.split(',').map(tag => `<span class="tag">${tag.trim()}</span>`).join('')}

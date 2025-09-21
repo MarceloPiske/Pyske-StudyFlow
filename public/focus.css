@@ -1,0 +1,284 @@
+/* Focus Session Styles */
+.focus-container {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.focus-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.focus-header h1 {
+  background: linear-gradient(135deg, var(--accent-color), #0056b3);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.focus-tools {
+  height: fit-content;
+}
+
+.pomodoro-timer {
+  text-align: center;
+  position: relative;
+}
+
+.timer-display {
+  font-family: var(--font-mono);
+  font-size: 4rem;
+  font-weight: 700;
+  color: var(--accent-color);
+  margin: 1.5rem 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, var(--accent-color), #0056b3);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.timer-mode {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--secondary-color);
+  border-radius: 20px;
+  display: inline-block;
+}
+
+.timer-controls {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin: 2rem 0;
+}
+
+.timer-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1.5rem 0;
+  padding: 1.5rem;
+  background: var(--secondary-color);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-color);
+}
+
+.focus-topic-selector {
+  margin: 1.5rem 0;
+}
+
+.youtube-input-group {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.youtube-input-group input {
+  flex: 1;
+}
+
+.video-container {
+  margin: 1rem 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.music-presets {
+  margin-top: 1.5rem;
+}
+
+.preset-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.btn-preset {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  background: white;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.btn-preset:hover {
+  background: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+  transform: translateY(-1px);
+}
+
+.current-topic-display {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.session-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, var(--secondary-color), #e9ecef);
+  border-radius: var(--radius);
+  border: 1px solid rgba(0, 123, 255, 0.1);
+}
+
+.session-stats .stat-item {
+  text-align: center;
+}
+
+.session-stats .stat-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.session-stats .stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent-color);
+  font-family: var(--font-mono);
+}
+
+.session-notes-input {
+  min-height: 150px;
+  resize: vertical;
+  margin-bottom: 1rem;
+}
+
+.notes-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.focus-ambient {
+  margin-top: 2rem;
+  padding: 2rem;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-color);
+}
+
+.ambient-controls h4 {
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+}
+
+.ambient-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.ambient-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  transition: var(--transition);
+}
+
+.ambient-option:hover {
+  background: rgba(0, 123, 255, 0.1);
+}
+
+.ambient-option input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+/* Focus Mode Animations */
+.timer-display {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+.pomodoro-timer.running .timer-display {
+  color: var(--success-color);
+}
+
+.pomodoro-timer.break .timer-display {
+  color: var(--warning-color);
+}
+
+.pomodoro-timer.running .timer-mode {
+  background: rgba(40, 167, 69, 0.1);
+  color: var(--success-color);
+}
+
+.pomodoro-timer.break .timer-mode {
+  background: rgba(255, 193, 7, 0.1);
+  color: #856404;
+}
+
+/* Responsive Focus Layout */
+@media (max-width: 768px) {
+  .timer-display {
+    font-size: 2.5rem;
+  }
+  
+  .timer-settings {
+    grid-template-columns: 1fr;
+  }
+  
+  .session-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .ambient-options {
+    grid-template-columns: 1fr;
+  }
+  
+  .preset-buttons {
+    justify-content: center;
+  }
+  
+  .timer-controls {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .notes-actions {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .timer-display {
+    font-size: 2rem;
+  }
+  
+  .focus-ambient {
+    padding: 1rem;
+  }
+  
+  .timer-settings {
+    padding: 1rem;
+  }
+}

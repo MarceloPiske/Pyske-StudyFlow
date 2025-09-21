@@ -126,28 +126,64 @@ export class DashboardModule {
 
       // Calculate total study time
       let totalSeconds = 0;
+      const topicStats = {};
       sessionsSnapshot.forEach((doc) => {
-        totalSeconds += doc.data().durationInSeconds || 0;
+        const data = doc.data();
+        totalSeconds += data.durationInSeconds || 0;
+        
+        // Aggregate by topic
+        if (data.topicName) {
+          if (!topicStats[data.topicName]) {
+            topicStats[data.topicName] = 0;
+          }
+          topicStats[data.topicName] += data.durationInSeconds || 0;
+        }
       });
       const totalHours = Math.round(totalSeconds / 3600);
 
       // Recent activity
       const recentActivity = [];
-      sessionsSnapshot.docs.slice(0, 5).forEach((doc) => {
+      
+      // Add study sessions
+      sessionsSnapshot.docs.slice(0, 3).forEach((doc) => {
         const data = doc.data();
         recentActivity.push({
           type: 'study',
-          title: `Estudou por ${Math.round(data.durationInSeconds / 60)} minutos`,
+          title: `Estudou ${data.topicName || 'Tópico'} por ${Math.round(data.durationInSeconds / 60)} minutos`,
           time: this.formatRelativeTime(data.createdAt?.toDate())
         });
       });
+
+      // Add recent books
+      booksSnapshot.docs.slice(0, 2).forEach((doc) => {
+        const data = doc.data();
+        recentActivity.push({
+          type: 'book',
+          title: `Adicionou o livro "${data.title}"`,
+          time: this.formatRelativeTime(data.createdAt?.toDate())
+        });
+      });
+
+      // Add recent notes
+      notesSnapshot.docs.slice(0, 2).forEach((doc) => {
+        const data = doc.data();
+        recentActivity.push({
+          type: 'note',
+          title: `Criou a anotação "${data.title}"`,
+          time: this.formatRelativeTime(data.createdAt?.toDate())
+        });
+      });
+
+      // Sort by most recent
+      recentActivity.sort((a, b) => new Date(b.time) - new Date(a.time));
 
       return {
         totalStudyTime: totalHours,
         totalTopics: topicsSnapshot.size,
         totalBooks: booksSnapshot.size,
         totalNotes: notesSnapshot.size,
-        recentActivity
+        recentActivity: recentActivity.slice(0, 5),
+        topicStats
       };
     } catch (error) {
       console.error('Error getting stats:', error);
@@ -156,7 +192,8 @@ export class DashboardModule {
         totalTopics: 0,
         totalBooks: 0,
         totalNotes: 0,
-        recentActivity: []
+        recentActivity: [],
+        topicStats: {}
       };
     }
   }
@@ -218,20 +255,26 @@ export class DashboardModule {
       });
     }
 
-    // Topics chart
+    // Topics chart with real data
     const topicsCtx = document.getElementById('topics-chart');
-    if (topicsCtx) {
+    if (topicsCtx && this.currentStats?.topicStats) {
+      const topicEntries = Object.entries(this.currentStats.topicStats);
+      const labels = topicEntries.map(([name]) => name);
+      const data = topicEntries.map(([, seconds]) => Math.round(seconds / 3600));
+      
       this.charts.topics = new Chart(topicsCtx, {
         type: 'doughnut',
         data: {
-          labels: ['Teologia', 'História', 'Filosofia', 'Literatura'],
+          labels: labels.length ? labels : ['Nenhum dado'],
           datasets: [{
-            data: [40, 25, 20, 15],
+            data: data.length ? data : [1],
             backgroundColor: [
               '#007bff',
               '#28a745',
               '#ffc107',
-              '#dc3545'
+              '#dc3545',
+              '#6f42c1',
+              '#fd7e14'
             ]
           }]
         },

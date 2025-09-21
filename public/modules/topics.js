@@ -11,12 +11,21 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
 
 export class TopicsModule {
-  constructor() {
+  constructor(db, user) {
+    this.db = db;
+    this.user = user;
     this.topics = [];
+    this.dataLoaded = false;
   }
 
-  async render(user) {
-    await this.loadTopics(user);
+  async ensureDataLoaded() {
+    if (!this.dataLoaded) {
+      await this.loadTopics();
+    }
+  }
+
+  async render() {
+    await this.ensureDataLoaded();
     
     return `
       <div class="topics-container">
@@ -82,11 +91,11 @@ export class TopicsModule {
     `;
   }
 
-  async loadTopics(user) {
+  async loadTopics() {
     try {
       const topicsQuery = query(
-        collection(window.db, 'topics'),
-        where('userId', '==', user.uid),
+        collection(this.db, 'topics'),
+        where('userId', '==', this.user.uid),
         orderBy('name')
       );
       const snapshot = await getDocs(topicsQuery);
@@ -95,6 +104,9 @@ export class TopicsModule {
       snapshot.forEach(doc => {
         this.topics.push({ id: doc.id, ...doc.data() });
       });
+      
+      this.dataLoaded = true;
+      console.log('Topics loaded:', this.topics);
     } catch (error) {
       console.error('Error loading topics:', error);
     }
@@ -189,17 +201,18 @@ export class TopicsModule {
         name,
         parentId,
         proficiency,
-        userId: window.auth.currentUser.uid
+        userId: this.user.uid
       };
-    console.log(topicData)
+
       if (topicId) {
-        await updateDoc(doc(window.db, 'topics', topicId), topicData);
+        await updateDoc(doc(this.db, 'topics', topicId), topicData);
       } else {
         topicData.createdAt = new Date();
-        await addDoc(collection(window.db, 'topics'), topicData);
+        await addDoc(collection(this.db, 'topics'), topicData);
       }
 
-      // Reload the page
+      // Mark data as stale and reload
+      this.dataLoaded = false;
       window.app.navigateToSection('topics');
     } catch (error) {
       console.error('Error saving topic:', error);
@@ -220,7 +233,7 @@ export class TopicsModule {
     if (!confirm('Tem certeza que deseja excluir este tópico?')) return;
 
     try {
-      await deleteDoc(doc(window.db, 'topics', topicId));
+      await deleteDoc(doc(this.db, 'topics', topicId));
       window.app.navigateToSection('topics');
     } catch (error) {
       console.error('Error deleting topic:', error);
