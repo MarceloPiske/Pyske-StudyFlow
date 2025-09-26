@@ -1,40 +1,19 @@
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDocs, 
-  query, 
-  where, 
-  orderBy 
-} from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
-
 export class BooksModule {
-  constructor(db, user) {
-    this.db = db;
-    this.user = user;
+  constructor() {
     this.books = [];
-    this.dataLoaded = false;
     this.relatedTopics = [];
   }
 
-  async ensureDataLoaded() {
-    if (!this.dataLoaded) {
-      await this.loadBooks();
-    }
-  }
-
-  async render(topicsData = []) {
+  async render(topicsData = [], booksData = []) {
     this.relatedTopics = topicsData;
-    await this.ensureDataLoaded();
+    this.books = booksData;
 
     return `
       <div class="books-container">
         <div class="books-header">
           <h1>Biblioteca Pessoal</h1>
           <button id="add-book-btn" class="btn btn-primary">
-            <span>📚</span> Adicionar Livro
+            <span class="material-icons">library_add</span> Adicionar Livro
           </button>
         </div>
 
@@ -54,7 +33,7 @@ export class BooksModule {
           <div class="modal-content">
             <div class="modal-header">
               <h2>Adicionar/Editar Livro</h2>
-              <button id="close-modal" class="btn-close">✕</button>
+              <button id="close-modal" class="btn-close"><span class="material-icons">close</span></button>
             </div>
             <div class="modal-body">
               <form id="book-form">
@@ -101,7 +80,7 @@ export class BooksModule {
                 <div class="form-group">
                   <label class="form-label">Avaliação</label>
                   <div class="rating-input" id="book-rating">
-                    ${[1,2,3,4,5].map(i => `<span class="star" data-rating="${i}">⭐</span>`).join('')}
+                    ${[1,2,3,4,5].map(i => `<span class="star material-icons" data-rating="${i}">star</span>`).join('')}
                   </div>
                 </div>
 
@@ -132,27 +111,6 @@ export class BooksModule {
         </div>
       </div>
     `;
-  }
-
-  async loadBooks() {
-    try {
-      const booksQuery = query(
-        collection(this.db, 'books'),
-        where('userId', '==', this.user.uid),
-        orderBy('createdAt', 'desc')
-      );
-      const snapshot = await getDocs(booksQuery);
-
-      this.books = [];
-      snapshot.forEach(doc => {
-        this.books.push({ id: doc.id, ...doc.data() });
-      });
-      
-      this.dataLoaded = true;
-      console.log('Books loaded:', this.books);
-    } catch (error) {
-      console.error('Error loading books:', error);
-    }
   }
 
   getTopicById(topicId) {
@@ -235,11 +193,11 @@ export class BooksModule {
     `).join('');
   }
 
-  init() {
-    this.setupEventListeners();
+  init(firestoreService) {
+    this.setupEventListeners(firestoreService);
   }
 
-  setupEventListeners() {
+  setupEventListeners(firestoreService) {
     // Add book button
     document.getElementById('add-book-btn')?.addEventListener('click', () => {
       this.showModal();
@@ -258,7 +216,7 @@ export class BooksModule {
     // Form submission
     document.getElementById('book-form')?.addEventListener('submit', (e) => {
       e.preventDefault();
-      this.handleFormSubmit();
+      this.handleFormSubmit(firestoreService);
     });
 
     // ISBN search
@@ -291,7 +249,7 @@ export class BooksModule {
         this.editBook(bookId);
       } else if (e.target.classList.contains('btn-delete')) {
         const bookId = e.target.dataset.bookId;
-        this.deleteBook(bookId);
+        this.deleteBook(bookId, firestoreService);
       } else if (e.target.classList.contains('btn-study')) {
         const bookId = e.target.dataset.bookId;
         const bookTitle = e.target.dataset.bookTitle;
@@ -343,7 +301,7 @@ export class BooksModule {
     document.getElementById('book-modal').classList.add('hidden');
   }
 
-  async handleFormSubmit() {
+  async handleFormSubmit(firestoreService) {
     const bookId = document.getElementById('book-id').value;
     const title = document.getElementById('book-title').value.trim();
     const author = document.getElementById('book-author').value.trim();
@@ -371,20 +329,18 @@ export class BooksModule {
         coverUrl,
         review,
         relatedTopicIds: selectedTopics,
-        rating: this.selectedRating || null,
-        userId: this.user.uid
+        rating: this.selectedRating || null
       };
 
       if (bookId) {
-        await updateDoc(doc(this.db, 'books', bookId), bookData);
+        await firestoreService.updateDocument('books', bookId, bookData);
       } else {
-        bookData.createdAt = new Date();
-        await addDoc(collection(this.db, 'books'), bookData);
+        await firestoreService.createDocument('books', bookData);
       }
 
       this.hideModal();
-      // Mark data as stale and reload
-      this.dataLoaded = false;
+      // Refresh central data and reload books
+      await window.app.refreshData('books');
       window.app.navigateToSection('books');
     } catch (error) {
       console.error('Error saving book:', error);
@@ -416,11 +372,13 @@ export class BooksModule {
     this.showModal();
   }
 
-  async deleteBook(bookId) {
+  async deleteBook(bookId, firestoreService) {
     if (!confirm('Tem certeza que deseja excluir este livro?')) return;
 
     try {
-      await deleteDoc(doc(this.db, 'books', bookId));
+      await firestoreService.deleteDocument('books', bookId);
+      // Refresh central data and reload books
+      await window.app.refreshData('books');
       window.app.navigateToSection('books');
     } catch (error) {
       console.error('Error deleting book:', error);
@@ -433,13 +391,13 @@ export class BooksModule {
       const primaryTopicId = book.relatedTopicIds[0];
       const topic = this.relatedTopics.find(t => t.id === primaryTopicId);
       if (topic) {
-        window.app.timer.start(primaryTopicId, topic.name, bookId);
+        window.app.startStudySession(primaryTopicId, topic.name, bookId);
         return;
       }
     }
     
     // If no related topics, start a generic study session
-    window.app.timer.start(null, `Lendo: ${bookTitle}`, bookId);
+    window.app.startStudySession(null, `Lendo: ${bookTitle}`, bookId);
   }
 
   clearForm() {

@@ -17,6 +17,9 @@
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Cal+Sans:wght@400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     
+    <!-- Google Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
     <!-- Firebase -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js';
@@ -60,9 +63,8 @@
     <link rel="stylesheet" href="topics.css">
     <link rel="stylesheet" href="books.css">
     <link rel="stylesheet" href="notes.css">
-    <link rel="stylesheet" href="study.css">
     <link rel="stylesheet" href="focus.css">
-    <link rel="stylesheet" href="timer.css">
+    <link rel="stylesheet" href="priorities.css">
 </head>
 <body>
     <!-- Loading Screen -->
@@ -93,9 +95,7 @@
                 <li><a href="#dashboard" class="nav-link active" data-section="dashboard">Dashboard</a></li>
                 <li><a href="#topics" class="nav-link" data-section="topics">Tópicos</a></li>
                 <li><a href="#books" class="nav-link" data-section="books">Livros</a></li>
-                <li><a href="#notes" class="nav-link" data-section="notes">Anotações</a></li>
-                <li><a href="#study" class="nav-link" data-section="study">Estudar</a></li>
-                <li><a href="#focus" class="nav-link" data-section="focus">Foco</a></li>
+                <li><a href="#priorities" class="nav-link" data-section="priorities">Prioridades</a></li>
             </ul>
             <div class="nav-user">
                 <button id="user-menu" class="btn-user">
@@ -110,24 +110,81 @@
             <!-- Content will be loaded dynamically -->
         </main>
 
-        <!-- Study Timer Overlay -->
-        <div id="timer-overlay" class="timer-overlay hidden">
-            <div class="timer-card">
-                <h2>Sessão de Estudo</h2>
-                <div class="timer-display">
-                    <span id="timer-time">00:00:00</span>
-                </div>
-                <div class="timer-topic">
-                    <span id="current-topic">Tópico Selecionado</span>
-                </div>
-                <div class="timer-controls">
-                    <button id="pause-timer" class="btn btn-secondary">Pausar</button>
-                    <button id="stop-timer" class="btn btn-primary">Finalizar</button>
-                </div>
-                <div class="timer-notes">
-                    <textarea id="session-notes" placeholder="Anotações da sessão..."></textarea>
-                </div>
+        <!-- Active Study Session Panel -->
+        <div id="active-session-panel" class="active-session-panel hidden">
+          <div class="session-info">
+            <div class="session-topic">
+              <span class="session-label">Estudando:</span>
+              <span id="session-topic-name">Tópico</span>
             </div>
+            <div class="session-timer">
+              <span id="session-elapsed-time">00:00:00</span>
+            </div>
+          </div>
+          <div class="session-controls">
+            <button id="session-music-btn" class="btn-session-control" title="Música"><span class="material-icons">music_note</span></button>
+            <button id="session-pause-btn" class="btn-session-control" title="Pausar/Continuar"><span class="material-icons">pause</span></button>
+            <button id="session-stop-btn" class="btn-session-control" title="Finalizar"><span class="material-icons">stop</span></button>
+            <button id="session-maximize-btn" class="btn-session-control" title="Maximizar"><span class="material-icons">open_in_full</span></button>
+          </div>
+        </div>
+
+        <!-- Session Music Modal -->
+        <div id="session-music-modal" class="modal hidden">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2>Música de Estudo</h2>
+              <button id="close-music-modal" class="btn-close"><span class="material-icons">close</span></button>
+            </div>
+            <div class="modal-body">
+              <div class="form-group">
+                <label class="form-label">Link do YouTube</label>
+                <div class="youtube-input-group">
+                  <input type="text" id="session-youtube-link" class="form-input" placeholder="Cole o link do YouTube aqui...">
+                  <button type="button" id="session-load-video" class="btn btn-secondary">Carregar</button>
+                </div>
+              </div>
+
+              <div class="video-container" id="session-video-container" style="display: none;">
+                <iframe id="session-youtube-iframe" width="100%" height="200" frameborder="0"></iframe>
+              </div>
+
+              <div class="music-presets">
+                <p class="form-label">Sugestões Rápidas:</p>
+                <div class="preset-buttons">
+                  <button class="btn-preset" data-video="jfKfPfyJRdk">Lofi Hip Hop</button>
+                  <button class="btn-preset" data-video="5qap5aO4i9A">Chuva</button>
+                  <button class="btn-preset" data-video="4xDzrJKXOOY">Piano Clássico</button>
+                  <button class="btn-preset" data-video="hHW1oY26kxQ">Sons da Natureza</button>
+                  <button class="btn-preset" data-video="M3xJZLqUQwQ">Café Ambient</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Notes Modal -->
+        <div id="session-notes-modal" class="modal hidden">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2>Finalizar Sessão de Estudo</h2>
+              <button id="close-session-modal" class="btn-close"><span class="material-icons">close</span></button>
+            </div>
+            <div class="modal-body">
+              <div class="session-summary">
+                <p><strong>Tópico:</strong> <span id="summary-topic-name"></span></p>
+                <p><strong>Duração:</strong> <span id="summary-duration"></span></p>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Anotações da Sessão (opcional)</label>
+                <textarea id="session-quick-notes" class="form-input" rows="4" placeholder="O que você aprendeu? Insights importantes..."></textarea>
+              </div>
+              <div class="form-actions">
+                <button id="save-session-btn" class="btn btn-primary">Salvar Sessão</button>
+                <button id="discard-session-btn" class="btn btn-secondary">Descartar</button>
+              </div>
+            </div>
+          </div>
         </div>
     </div>
 
