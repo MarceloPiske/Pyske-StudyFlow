@@ -211,10 +211,10 @@ export class TopicPage {
     // Form cancel is handled internally by TopicForm
   }
 
-  mount(containerSelector) {
+  async mount(containerSelector) {
     const container = document.querySelector(containerSelector);
     if (container) {
-      container.innerHTML = this.render();
+      container.innerHTML = await this.render();
       this.element = container;
       this.setupListeners();
     }
