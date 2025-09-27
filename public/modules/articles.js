@@ -38,71 +38,7 @@ export class ArticlesModule {
           ${this.renderArticles()}
         </div>
 
-        <!-- Article Form Modal -->
-        <div id="article-modal" class="modal hidden">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h2>Adicionar/Editar Recurso</h2>
-              <button id="close-article-modal" class="btn-close"><span class="material-icons">close</span></button>
-            </div>
-            <div class="modal-body">
-              <form id="article-form">
-                <input type="hidden" id="article-id">
-
-                <div class="form-group">
-                  <label class="form-label">Tipo de Recurso</label>
-                  <select id="article-type" class="form-input">
-                    <option value="web_article">Artigo Web</option>
-                    <option value="youtube_video">Vídeo YouTube</option>
-                    <option value="podcast">Podcast</option>
-                    <option value="pdf_document">Documento PDF</option>
-                  </select>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Título</label>
-                  <input type="text" id="article-title" class="form-input" required>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">URL/Link</label>
-                  <input type="url" id="article-url" class="form-input" required>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Fonte/Autor</label>
-                  <input type="text" id="article-source" class="form-input" placeholder="Ex: Stanford Encyclopedia, TED, etc.">
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Resumo Pessoal</label>
-                  <textarea id="article-summary" class="form-input" rows="4" placeholder="Principais ideias, pontos importantes..."></textarea>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Tópicos Relacionados</label>
-                  <div class="topics-selector" id="article-topics-selector">
-                    ${this.renderTopicsCheckboxes()}
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">
-                    <input type="checkbox" id="article-favorite"> Marcar como favorito
-                  </label>
-                </div>
-
-                <div class="form-actions">
-                  <button type="submit" class="btn btn-primary">
-                    <span class="btn-text">Salvar</span>
-                    <span class="btn-loading hidden">Salvando...</span>
-                  </button>
-                  <button type="button" id="cancel-article" class="btn btn-secondary">Cancelar</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
+        <!-- Article Form Modal is now managed by ModalManager -->
       </div>
     `;
   }
@@ -233,30 +169,14 @@ export class ArticlesModule {
   }
 
   // Initialize list view listeners
-  initListViewListeners(firestoreService) {
-    this.setupEventListeners(firestoreService);
+  initListViewListeners() {
+    this.setupEventListeners();
   }
 
-  setupEventListeners(firestoreService) {
+  setupEventListeners() {
     // Add article button
     document.getElementById('add-article-btn')?.addEventListener('click', () => {
-      this.showModal();
-    });
-
-    // Close modal
-    document.getElementById('close-article-modal')?.addEventListener('click', () => {
-      this.hideModal();
-    });
-
-    // Cancel button
-    document.getElementById('cancel-article')?.addEventListener('click', () => {
-      this.hideModal();
-    });
-
-    // Form submission
-    document.getElementById('article-form')?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.handleFormSubmit(firestoreService);
+      this.showArticleFormModal();
     });
 
     // Filter buttons
@@ -272,33 +192,106 @@ export class ArticlesModule {
 
     // Article actions
     document.addEventListener('click', (e) => {
-      if (e.target.classList.contains('btn-open')) {
-        const url = e.target.dataset.articleUrl;
+      const openBtn = e.target.closest('.btn-open');
+      const editBtn = e.target.closest('.btn-edit');
+      const deleteBtn = e.target.closest('.btn-delete');
+      const topicTag = e.target.closest('.topic-tag');
+
+      if (openBtn) {
+        const url = openBtn.dataset.articleUrl;
         window.open(url, '_blank');
-      } else if (e.target.classList.contains('btn-edit')) {
-        const articleId = e.target.dataset.articleId;
-        this.editArticle(articleId);
-      } else if (e.target.classList.contains('btn-delete')) {
-        const articleId = e.target.dataset.articleId;
-        this.deleteArticle(articleId, firestoreService);
-      } else if (e.target.classList.contains('topic-tag')) {
-        const topicId = e.target.dataset.topicId;
+      } else if (editBtn) {
+        const articleId = editBtn.dataset.articleId;
+        this.showArticleFormModal(articleId);
+      } else if (deleteBtn) {
+        const articleId = deleteBtn.dataset.articleId;
+        this.deleteArticle(articleId, window.app.firestoreService);
+      } else if (topicTag) {
+        const topicId = topicTag.dataset.topicId;
         window.app.navigateToSection('topics', { detailId: topicId });
       }
     });
   }
 
-  showModal() {
-    document.getElementById('article-modal').classList.remove('hidden');
-    this.clearForm();
+  showArticleFormModal(articleId = null) {
+    const article = articleId ? this.articles.find(a => a.id === articleId) : null;
+    const title = article ? 'Editar Recurso' : 'Adicionar Recurso';
+
+    const content = `
+      <form id="article-form">
+        <input type="hidden" id="article-id" value="${article?.id || ''}">
+
+        <div class="form-group">
+          <label class="form-label">Tipo de Recurso</label>
+          <select id="article-type" class="form-input">
+            <option value="web_article" ${article?.type === 'web_article' ? 'selected' : ''}>Artigo Web</option>
+            <option value="youtube_video" ${article?.type === 'youtube_video' ? 'selected' : ''}>Vídeo YouTube</option>
+            <option value="podcast" ${article?.type === 'podcast' ? 'selected' : ''}>Podcast</option>
+            <option value="pdf_document" ${article?.type === 'pdf_document' ? 'selected' : ''}>Documento PDF</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Título</label>
+          <input type="text" id="article-title" class="form-input" value="${article?.title || ''}" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">URL/Link</label>
+          <input type="url" id="article-url" class="form-input" value="${article?.content || ''}" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Fonte/Autor</label>
+          <input type="text" id="article-source" class="form-input" placeholder="Ex: Stanford Encyclopedia, TED, etc." value="${article?.source || ''}">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Resumo Pessoal</label>
+          <textarea id="article-summary" class="form-input" rows="4" placeholder="Principais ideias, pontos importantes...">${article?.personal_summary || ''}</textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Tópicos Relacionados</label>
+          <div class="topics-selector" id="article-topics-selector">
+            ${this.renderTopicsCheckboxes(article?.associatedTopicIds)}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <input type="checkbox" id="article-favorite" ${article?.isFavorite ? 'checked' : ''}> Marcar como favorito
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">
+            <span class="btn-text">Salvar</span>
+            <span class="btn-loading hidden">Salvando...</span>
+          </button>
+          <button type="button" id="cancel-article" class="btn btn-secondary">Cancelar</button>
+        </div>
+      </form>
+    `;
+
+    window.app.modalManager.show({
+      title,
+      content,
+      onMount: (modalElement) => {
+        modalElement.querySelector('#article-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          this.handleFormSubmit(modalElement);
+        });
+
+        modalElement.querySelector('#cancel-article').addEventListener('click', () => {
+          window.app.modalManager.hide();
+        });
+      }
+    });
   }
 
-  hideModal() {
-    document.getElementById('article-modal').classList.add('hidden');
-  }
-
-  async handleFormSubmit(firestoreService) {
-    const submitBtn = document.querySelector('#article-form button[type="submit"]');
+  async handleFormSubmit(modalElement) {
+    const submitBtn = modalElement.querySelector('#article-form button[type="submit"]');
     const btnText = submitBtn.querySelector('.btn-text');
     const btnLoading = submitBtn.querySelector('.btn-loading');
     
@@ -308,22 +301,26 @@ export class ArticlesModule {
     btnLoading.classList.remove('hidden');
 
     try {
-      const articleId = document.getElementById('article-id').value;
-      const type = document.getElementById('article-type').value;
-      const title = document.getElementById('article-title').value.trim();
-      const url = document.getElementById('article-url').value.trim();
-      const source = document.getElementById('article-source').value.trim();
-      const summary = document.getElementById('article-summary').value.trim();
-      const isFavorite = document.getElementById('article-favorite').checked;
+      const firestoreService = window.app.firestoreService;
+      const articleId = modalElement.querySelector('#article-id').value;
+      const type = modalElement.querySelector('#article-type').value;
+      const title = modalElement.querySelector('#article-title').value.trim();
+      const url = modalElement.querySelector('#article-url').value.trim();
+      const source = modalElement.querySelector('#article-source').value.trim();
+      const summary = modalElement.querySelector('#article-summary').value.trim();
+      const isFavorite = modalElement.querySelector('#article-favorite').checked;
 
       // Get selected topics
       const selectedTopics = [];
-      document.querySelectorAll('#article-topics-selector input[type="checkbox"]:checked').forEach(checkbox => {
+      modalElement.querySelectorAll('#article-topics-selector input[type="checkbox"]:checked').forEach(checkbox => {
         selectedTopics.push(checkbox.value);
       });
 
       if (!title || !url) {
         alert('Título e URL são obrigatórios.');
+        submitBtn.disabled = false;
+        btnText.classList.remove('hidden');
+        btnLoading.classList.add('hidden');
         return;
       }
 
@@ -345,7 +342,7 @@ export class ArticlesModule {
         await firestoreService.createDocument('resources', articleData);
       }
 
-      this.hideModal();
+      window.app.modalManager.hide();
       // Use new refresh method instead of full navigation
       await window.app.refreshDataAndReRender('articles');
     } catch (error) {
@@ -359,26 +356,6 @@ export class ArticlesModule {
     }
   }
 
-  editArticle(articleId) {
-    const article = this.articles.find(a => a.id === articleId);
-    if (!article) return;
-
-    document.getElementById('article-id').value = article.id;
-    document.getElementById('article-type').value = article.type;
-    document.getElementById('article-title').value = article.title;
-    document.getElementById('article-url').value = article.content;
-    document.getElementById('article-source').value = article.source || '';
-    document.getElementById('article-summary').value = article.personal_summary || '';
-    document.getElementById('article-favorite').checked = article.isFavorite || false;
-
-    // Set selected topics
-    document.querySelectorAll('#article-topics-selector input[type="checkbox"]').forEach(checkbox => {
-      checkbox.checked = article.associatedTopicIds?.includes(checkbox.value) || false;
-    });
-
-    this.showModal();
-  }
-
   async deleteArticle(articleId, firestoreService) {
     if (!confirm('Tem certeza que deseja excluir este recurso?')) return;
 
@@ -390,14 +367,5 @@ export class ArticlesModule {
       console.error('Error deleting article:', error);
       alert('Erro ao excluir recurso. Tente novamente.');
     }
-  }
-
-  clearForm() {
-    document.getElementById('article-form').reset();
-    document.getElementById('article-id').value = '';
-    // Clear topic selections
-    document.querySelectorAll('#article-topics-selector input[type="checkbox"]').forEach(checkbox => {
-      checkbox.checked = false;
-    });
   }
 }

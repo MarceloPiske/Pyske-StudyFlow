@@ -174,7 +174,7 @@ export class TopicDetailView {
 
   setupListeners(firestoreService) {
     this.setupTabNavigation();
-    this.resourcesManager.setupListeners(firestoreService);
+    this.resourcesManager.setupListeners();
     this.focusSessionUI.setupListeners();
     this.setupOverviewActions(firestoreService);
   }

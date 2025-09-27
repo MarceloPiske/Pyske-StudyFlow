@@ -14,6 +14,7 @@ import { ArticlesModule } from './modules/articles.js';
 import { PrioritiesModule } from './modules/priorities.js';
 import { FirestoreService } from './services/firestore-service.js';
 import { SessionManager } from './services/session-manager.js';
+import { ModalManager } from './utils/ModalManager.js';
 
 class App {
   constructor() {
@@ -31,6 +32,7 @@ class App {
     this.allResources = [];
     this.priorityQueueIds = [];
     this.firestoreService = null;
+    this.modalManager = new ModalManager();
     // ======================================================
     
     // Session management

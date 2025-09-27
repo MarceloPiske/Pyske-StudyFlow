@@ -67,3 +67,45 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+# Arquivos de log e cache do Firebase
+.firebase/
+database.rules.json.bak
+*.log
+firebase-debug.log
+firebase-debug.*.log
+
+# Configurações e cache de emuladores locais
+.firebaserc
+emulators.log
+*.jar
+*.blob
+*.snapshot
+.firebase/emulators/
+
+# Arquivos de configuração específicos do ambiente que podem conter chaves secretas
+# É uma boa prática usar variáveis de ambiente ou o Firebase CLI para gerenciar configurações
+# em vez de commitar esses arquivos.
+# Descomente se você tiver um arquivo .env para suas chaves.
+# .env
+# .env.local
+# .env.*.local
+
+# Dependências do Node.js (se você usa Cloud Functions ou outras ferramentas baseadas em Node)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Arquivos gerados pelo sistema operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos de build (se você estiver compilando um front-end, por exemplo)
+/dist
+/build
+/out
+
+# Arquivos de configuração de IDEs populares
+.idea/
+.vscode/
+*.swp
+*~

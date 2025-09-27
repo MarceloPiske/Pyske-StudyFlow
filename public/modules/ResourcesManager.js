@@ -30,8 +30,7 @@ export class ResourcesManager {
           ${this.renderResourcesList(resources)}
         </div>
 
-        <!-- Resource Form Modal -->
-        ${this.renderResourceModal(topic)}
+        <!-- Resource Form Modal is now managed by ModalManager -->
       </div>
     `;
   }
@@ -69,62 +68,6 @@ export class ResourcesManager {
     `).join('');
   }
 
-  renderResourceModal(topic) {
-    return `
-      <div id="resource-modal" class="modal hidden">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h2>Adicionar/Editar Recurso</h2>
-            <button id="close-resource-modal" class="btn-close"><span class="material-icons">close</span></button>
-          </div>
-          <div class="modal-body">
-            <form id="resource-form">
-              <input type="hidden" id="resource-id">
-              <input type="hidden" id="resource-topic-id" value="${topic.id}">
-
-              <div class="form-group">
-                <label class="form-label">Tipo de Recurso</label>
-                <select id="resource-type" class="form-input">
-                  <option value="internal_note">Nota Interna</option>
-                  <option value="web_article">Artigo Web</option>
-                  <option value="google_doc">Google Docs</option>
-                  <option value="drive_pdf">PDF do Drive</option>
-                  <option value="youtube_video">Vídeo YouTube</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Título</label>
-                <input type="text" id="resource-title" class="form-input" required>
-              </div>
-
-              <div class="form-group" id="content-group">
-                <label class="form-label">Conteúdo/Link</label>
-                <div id="note-editor" class="note-editor" contenteditable="true" placeholder="Escreva sua nota aqui..."></div>
-                <input type="url" id="resource-url" class="form-input hidden" placeholder="Cole o link aqui...">
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Fonte (opcional)</label>
-                <input type="text" id="resource-source" class="form-input" placeholder="Ex: Stanford Encyclopedia, autor, site">
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Seu Resumo Pessoal</label>
-                <textarea id="resource-summary" class="form-input" rows="4" placeholder="Principais ideias, conexões, insights..."></textarea>
-              </div>
-
-              <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Salvar</button>
-                <button type="button" id="cancel-resource" class="btn btn-secondary">Cancelar</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
   getResourceTypeIcon(type) {
     const icons = {
       'internal_note': '<span class="material-icons">edit_note</span>',
@@ -136,30 +79,10 @@ export class ResourcesManager {
     return icons[type] || '<span class="material-icons">insert_drive_file</span>';
   }
 
-  setupListeners(firestoreService) {
+  setupListeners() {
     // Add resource button
     document.getElementById('add-resource-btn')?.addEventListener('click', () => {
-      this.showModal();
-    });
-
-    // Resource type change
-    document.getElementById('resource-type')?.addEventListener('change', (e) => {
-      this.toggleInput(e.target.value);
-    });
-
-    // Resource form submission
-    document.getElementById('resource-form')?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.handleSubmit(firestoreService);
-    });
-
-    // Modal controls
-    document.getElementById('close-resource-modal')?.addEventListener('click', () => {
-      this.hideModal();
-    });
-
-    document.getElementById('cancel-resource')?.addEventListener('click', () => {
-      this.hideModal();
+      this.showResourceFormModal();
     });
 
     // Resource filters
@@ -178,77 +101,124 @@ export class ResourcesManager {
       if (editBtn) {
         this.edit(editBtn.dataset.resourceId);
       } else if (deleteBtn) {
-        this.delete(deleteBtn.dataset.resourceId, firestoreService);
+        this.delete(deleteBtn.dataset.resourceId, window.app.firestoreService);
       }
     });
   }
 
-  showModal(prefillData = null) {
-    this.clearForm();
-    if (prefillData) {
-        document.getElementById('resource-title').value = prefillData.title;
-        document.getElementById('resource-type').value = prefillData.type;
-        this.toggleInput(prefillData.type);
-        if (prefillData.type === 'internal_note') {
-            document.getElementById('note-editor').innerHTML = prefillData.content.replace(/\\n/g, '<br>');
-        }
-        document.getElementById('resource-source').value = prefillData.source;
-    }
-    UIUtils.showModal('resource-modal');
+  showResourceFormModal(resourceId = null, prefillData = null) {
+    const resource = resourceId ? this.resources.find(r => r.id === resourceId) : null;
+    const data = resource || prefillData;
+    const title = resource ? 'Editar Recurso' : 'Adicionar Recurso';
+
+    const content = `
+      <form id="resource-form">
+        <input type="hidden" id="resource-id" value="${data?.id || ''}">
+        <input type="hidden" id="resource-topic-id" value="${this.topic.id}">
+
+        <div class="form-group">
+          <label class="form-label">Tipo de Recurso</label>
+          <select id="resource-type" class="form-input">
+            <option value="internal_note" ${data?.type === 'internal_note' ? 'selected' : ''}>Nota Interna</option>
+            <option value="web_article" ${data?.type === 'web_article' ? 'selected' : ''}>Artigo Web</option>
+            <option value="google_doc" ${data?.type === 'google_doc' ? 'selected' : ''}>Google Docs</option>
+            <option value="drive_pdf" ${data?.type === 'drive_pdf' ? 'selected' : ''}>PDF do Drive</option>
+            <option value="youtube_video" ${data?.type === 'youtube_video' ? 'selected' : ''}>Vídeo YouTube</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Título</label>
+          <input type="text" id="resource-title" class="form-input" value="${data?.title || ''}" required>
+        </div>
+
+        <div class="form-group" id="content-group">
+          <label class="form-label">Conteúdo/Link</label>
+          <div id="note-editor" class="note-editor" contenteditable="true" placeholder="Escreva sua nota aqui...">${(data?.type === 'internal_note' && data.content) ? data.content.replace(/\n/g, '<br>') : ''}</div>
+          <input type="url" id="resource-url" class="form-input hidden" placeholder="Cole o link aqui..." value="${data?.type !== 'internal_note' ? (data?.content || '') : ''}">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Fonte (opcional)</label>
+          <input type="text" id="resource-source" class="form-input" placeholder="Ex: Stanford Encyclopedia, autor, site" value="${data?.source || ''}">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Seu Resumo Pessoal</label>
+          <textarea id="resource-summary" class="form-input" rows="4" placeholder="Principais ideias, conexões, insights...">${data?.personal_summary || ''}</textarea>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Salvar</button>
+          <button type="button" id="cancel-resource" class="btn btn-secondary">Cancelar</button>
+        </div>
+      </form>
+    `;
+
+    window.app.modalManager.show({
+      title,
+      content,
+      onMount: (modalElement) => {
+        const form = modalElement.querySelector('#resource-form');
+        const typeSelect = modalElement.querySelector('#resource-type');
+
+        const toggleInput = (type) => {
+          const editor = modalElement.querySelector('#note-editor');
+          const urlInput = modalElement.querySelector('#resource-url');
+          if (type === 'internal_note') {
+            editor.classList.remove('hidden');
+            urlInput.classList.add('hidden');
+            urlInput.required = false;
+          } else {
+            editor.classList.add('hidden');
+            urlInput.classList.remove('hidden');
+            urlInput.required = true;
+          }
+        };
+
+        toggleInput(typeSelect.value); // Initial state
+
+        typeSelect.addEventListener('change', (e) => toggleInput(e.target.value));
+
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          this.handleSubmit(modalElement);
+        });
+
+        modalElement.querySelector('#cancel-resource').addEventListener('click', () => {
+          window.app.modalManager.hide();
+        });
+      }
+    });
   }
 
-  hideModal() {
-    UIUtils.hideModal('resource-modal');
-  }
-
-  toggleInput(type) {
-    const editor = document.getElementById('note-editor');
-    const urlInput = document.getElementById('resource-url');
-
-    if (type === 'internal_note') {
-      editor.classList.remove('hidden');
-      urlInput.classList.add('hidden');
-      urlInput.required = false;
-    } else {
-      editor.classList.add('hidden');
-      urlInput.classList.remove('hidden');
-      urlInput.required = true;
-    }
-  }
-
-  async handleSubmit(firestoreService) {
-    const submitBtn = document.querySelector('#resource-form button[type="submit"]');
-    const btnText = submitBtn.querySelector('.btn-text') || submitBtn;
-    const btnLoading = submitBtn.querySelector('.btn-loading');
-    
-    // Show loading state if elements exist
-    if (btnLoading) {
-      submitBtn.disabled = true;
-      btnText.classList.add('hidden');
-      btnLoading.classList.remove('hidden');
-    } else {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Salvando...';
-    }
+  async handleSubmit(modalElement) {
+    const submitBtn = modalElement.querySelector('#resource-form button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Salvando...';
 
     try {
-      const resourceId = document.getElementById('resource-id').value;
-      const topicId = document.getElementById('resource-topic-id').value;
+      const firestoreService = window.app.firestoreService;
+      const resourceId = modalElement.querySelector('#resource-id').value;
+      const topicId = modalElement.querySelector('#resource-topic-id').value;
 
-      const type = document.getElementById('resource-type').value;
-      const title = document.getElementById('resource-title').value.trim();
-      const source = document.getElementById('resource-source').value.trim();
-      const summary = document.getElementById('resource-summary').value.trim();
+      const type = modalElement.querySelector('#resource-type').value;
+      const title = modalElement.querySelector('#resource-title').value.trim();
+      const source = modalElement.querySelector('#resource-source').value.trim();
+      const summary = modalElement.querySelector('#resource-summary').value.trim();
       
       let content;
       if (type === 'internal_note') {
-        content = document.getElementById('note-editor').innerHTML;
+        content = modalElement.querySelector('#note-editor').innerHTML;
       } else {
-        content = document.getElementById('resource-url').value;
+        content = modalElement.querySelector('#resource-url').value;
       }
 
       if (!title || !content) {
           alert('Título e Conteúdo/Link são obrigatórios.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
           return;
       }
 
@@ -269,7 +239,7 @@ export class ResourcesManager {
         await firestoreService.createDocument('resources', resourceData);
       }
 
-      this.hideModal();
+      window.app.modalManager.hide();
       // Use new refresh method
       await window.app.refreshDataAndReRender('topics');
     } catch (error) {
@@ -277,14 +247,8 @@ export class ResourcesManager {
       alert('Erro ao salvar recurso.');
     } finally {
       // Reset button state
-      if (btnLoading) {
-        submitBtn.disabled = false;
-        btnText.classList.remove('hidden');
-        btnLoading.classList.add('hidden');
-      } else {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Salvar';
-      }
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
     }
   }
 
@@ -297,34 +261,8 @@ export class ResourcesManager {
     });
   }
 
-  clearForm() {
-    UIUtils.clearForm('resource-form');
-    const editor = document.getElementById('note-editor');
-    if (editor) editor.innerHTML = '';
-    const urlInput = document.getElementById('resource-url');
-    if(urlInput) urlInput.value = '';
-    this.toggleInput('internal_note');
-  }
-
   edit(resourceId) {
-    const resource = this.resources.find(r => r.id === resourceId);
-    if (!resource) return;
-
-    this.clearForm();
-    document.getElementById('resource-id').value = resource.id;
-    document.getElementById('resource-title').value = resource.title;
-    document.getElementById('resource-type').value = resource.type;
-    document.getElementById('resource-source').value = resource.source || '';
-    document.getElementById('resource-summary').value = resource.personal_summary || '';
-    
-    this.toggleInput(resource.type);
-    if (resource.type === 'internal_note') {
-        document.getElementById('note-editor').innerHTML = resource.content;
-    } else {
-        document.getElementById('resource-url').value = resource.content;
-    }
-
-    this.showModal();
+    this.showResourceFormModal(resourceId);
   }
 
   async delete(resourceId, firestoreService) {

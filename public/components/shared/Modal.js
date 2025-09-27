@@ -4,6 +4,7 @@ export class Modal {
     this.title = props.title;
     this.content = props.content;
     this.element = null;
+    this.onClose = props.onClose;
   }
 
   render() {
@@ -27,13 +28,23 @@ export class Modal {
     
     const closeBtn = this.element.querySelector('.btn-close');
     if (closeBtn) {
-      closeBtn.addEventListener('click', () => this.hide());
+      closeBtn.addEventListener('click', () => {
+        if (this.onClose) {
+          this.onClose();
+        } else {
+          this.hide();
+        }
+      });
     }
 
     // Close on backdrop click
     this.element.addEventListener('click', (e) => {
       if (e.target === this.element) {
-        this.hide();
+        if (this.onClose) {
+          this.onClose();
+        } else {
+          this.hide();
+        }
       }
     });
   }
@@ -66,4 +77,3 @@ export class Modal {
     }
   }
 }
-

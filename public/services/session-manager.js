@@ -9,6 +9,7 @@ export class SessionManager {
     this.user = user;
     this.activeSession = null;
     this.musicPaused = false;
+    this._startingSession = false; // Add guard property
     this.setupEventListeners();
   }
 
@@ -68,8 +69,12 @@ export class SessionManager {
 
   startSession(topicId, topicName, bookId = null, sessionType = 'study') {
     // Prevent multiple session starts
+    if (this._startingSession) return;
+    this._startingSession = true;
+
     if (this.activeSession) {
       if (!confirm('Já existe uma sessão ativa. Deseja finalizar a sessão atual e iniciar uma nova?')) {
+        this._startingSession = false;
         return;
       }
       this.forceEndSession(); // Force end without saving
@@ -91,6 +96,7 @@ export class SessionManager {
     this.startTimer();
     
     console.log('Started study session:', this.activeSession);
+    setTimeout(() => { this._startingSession = false; }, 500); // Reset guard after a short delay
   }
 
   showPanel() {

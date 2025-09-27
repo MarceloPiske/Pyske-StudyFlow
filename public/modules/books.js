@@ -41,90 +41,7 @@ export class BooksModule {
           ${this.renderBooks()}
         </div>
 
-        <!-- Book Form Modal -->
-        <div id="book-modal" class="modal hidden">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h2>Adicionar/Editar Livro</h2>
-              <button id="close-modal" class="btn-close"><span class="material-icons">close</span></button>
-            </div>
-            <div class="modal-body">
-              <form id="book-form">
-                <input type="hidden" id="book-id">
-
-                <div class="form-group">
-                  <label class="form-label">Buscar por ISBN (opcional)</label>
-                  <div class="isbn-search">
-                    <input type="text" id="book-isbn" class="form-input" placeholder="Ex: 9788573590837">
-                    <button type="button" id="search-isbn" class="btn btn-secondary">Buscar</button>
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Título</label>
-                  <input type="text" id="book-title" class="form-input" required>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Autor</label>
-                  <input type="text" id="book-author" class="form-input" required>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Status</label>
-                  <select id="book-status" class="form-input">
-                    <option value="want-to-read">Quero Ler</option>
-                    <option value="reading">Lendo</option>
-                    <option value="read">Lido</option>
-                  </select>
-                </div>
-
-                <div class="form-row">
-                  <div class="form-group">
-                    <label class="form-label">Página Atual</label>
-                    <input type="number" id="book-current-page" class="form-input" min="0">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Total de Páginas</label>
-                    <input type="number" id="book-total-pages" class="form-input" min="1">
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Avaliação</label>
-                  <div class="rating-input" id="book-rating">
-                    ${[1,2,3,4,5].map(i => `<span class="star material-icons" data-rating="${i}">star</span>`).join('')}
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Resenha Pessoal</label>
-                  <textarea id="book-review" class="form-input" rows="3" placeholder="Suas impressões sobre o livro..."></textarea>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Tópicos Relacionados</label>
-                  <div class="topics-selector" id="book-topics-selector">
-                    ${this.renderTopicsCheckboxes()}
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">URL da Capa</label>
-                  <input type="url" id="book-cover" class="form-input">
-                </div>
-
-                <div class="form-actions">
-                  <button type="submit" class="btn btn-primary">
-                    <span class="btn-text">Salvar</span>
-                    <span class="btn-loading hidden">Salvando...</span>
-                  </button>
-                  <button type="button" id="cancel-book" class="btn btn-secondary">Cancelar</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
+        <!-- Book Form Modal is now managed by ModalManager -->
       </div>
     `;
   }
@@ -196,22 +113,22 @@ export class BooksModule {
     return this.relatedTopics?.find(t => t.id === topicId);
   }
 
-  renderTopicsCheckboxes() {
+  renderTopicsCheckboxes(selectedIds = []) {
     if (!this.relatedTopics?.length) {
       return '<p class="empty-state">Crie alguns tópicos primeiro para relacioná-los aos livros.</p>';
     }
 
     return this.relatedTopics.map(topic => `
       <label class="topic-checkbox">
-        <input type="checkbox" value="${topic.id}" data-topic-name="${topic.name}">
+        <input type="checkbox" value="${topic.id}" data-topic-name="${topic.name}" ${selectedIds.includes(topic.id) ? 'checked' : ''}>
         <span>${topic.name}</span>
       </label>
     `).join('');
   }
 
   // Initialize list view listeners
-  initListViewListeners(firestoreService) {
-    this.setupEventListeners(firestoreService);
+  initListViewListeners() {
+    this.setupEventListeners();
   }
 
   // Initialize detail view listeners
@@ -219,38 +136,10 @@ export class BooksModule {
     this.detailView.setupListeners(firestoreService);
   }
 
-  setupEventListeners(firestoreService) {
+  setupEventListeners() {
     // Add book button
     document.getElementById('add-book-btn')?.addEventListener('click', () => {
-      this.showModal();
-    });
-
-    // Close modal
-    document.getElementById('close-modal')?.addEventListener('click', () => {
-      this.hideModal();
-    });
-
-    // Cancel button
-    document.getElementById('cancel-book')?.addEventListener('click', () => {
-      this.hideModal();
-    });
-
-    // Form submission
-    document.getElementById('book-form')?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.handleFormSubmit(firestoreService);
-    });
-
-    // ISBN search
-    document.getElementById('search-isbn')?.addEventListener('click', () => {
-      this.searchByISBN();
-    });
-
-    // Rating stars
-    document.querySelectorAll('#book-rating .star').forEach(star => {
-      star.addEventListener('click', (e) => {
-        this.setRating(parseInt(e.target.dataset.rating));
-      });
+      this.showBookFormModal();
     });
 
     // Filter buttons
@@ -266,28 +155,145 @@ export class BooksModule {
 
     // Book actions
     document.addEventListener('click', (e) => {
-      if (e.target.classList.contains('btn-edit')) {
-        const bookId = e.target.dataset.bookId;
-        this.editBook(bookId);
-      } else if (e.target.classList.contains('btn-delete')) {
-        const bookId = e.target.dataset.bookId;
-        this.deleteBook(bookId, firestoreService);
-      } else if (e.target.classList.contains('btn-study')) {
-        const bookId = e.target.dataset.bookId;
-        const bookTitle = e.target.dataset.bookTitle;
+      const editBtn = e.target.closest('.btn-edit');
+      const deleteBtn = e.target.closest('.btn-delete');
+      const studyBtn = e.target.closest('.btn-study');
+      const topicTag = e.target.closest('.topic-tag');
+      const bookTitleEl = e.target.closest('.book-title');
+
+      if (editBtn) {
+        const bookId = editBtn.dataset.bookId;
+        this.showBookFormModal(bookId);
+      } else if (deleteBtn) {
+        const bookId = deleteBtn.dataset.bookId;
+        this.deleteBook(bookId, window.app.firestoreService);
+      } else if (studyBtn) {
+        const bookId = studyBtn.dataset.bookId;
+        const bookTitle = studyBtn.dataset.bookTitle;
         this.startStudySession(bookId, bookTitle);
-      } else if (e.target.classList.contains('topic-tag')) {
-        const topicId = e.target.dataset.topicId;
+      } else if (topicTag) {
+        const topicId = topicTag.dataset.topicId;
         window.app.navigateToSection('topics', { detailId: topicId });
-      } else if (e.target.classList.contains('book-title')) {
-        const bookId = e.target.dataset.bookId;
+      } else if (bookTitleEl) {
+        const bookId = bookTitleEl.dataset.bookId;
         window.app.navigateToSection('books', { detailId: bookId });
       }
     });
   }
 
-  async searchByISBN() {
-    const isbn = document.getElementById('book-isbn').value.trim();
+  showBookFormModal(bookId = null) {
+    const book = bookId ? this.books.find(b => b.id === bookId) : null;
+    const title = book ? 'Editar Livro' : 'Adicionar Livro';
+    this.selectedRating = book?.rating || null;
+
+    const content = `
+      <form id="book-form">
+        <input type="hidden" id="book-id" value="${book ? book.id : ''}">
+
+        <div class="form-group">
+          <label class="form-label">Buscar por ISBN (opcional)</label>
+          <div class="isbn-search">
+            <input type="text" id="book-isbn" class="form-input" placeholder="Ex: 9788573590837">
+            <button type="button" id="search-isbn" class="btn btn-secondary">Buscar</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Título</label>
+          <input type="text" id="book-title" class="form-input" value="${book?.title || ''}" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Autor</label>
+          <input type="text" id="book-author" class="form-input" value="${book?.author || ''}" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select id="book-status" class="form-input">
+            <option value="want-to-read" ${book?.status === 'want-to-read' ? 'selected' : ''}>Quero Ler</option>
+            <option value="reading" ${book?.status === 'reading' ? 'selected' : ''}>Lendo</option>
+            <option value="read" ${book?.status === 'read' ? 'selected' : ''}>Lido</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Página Atual</label>
+            <input type="number" id="book-current-page" class="form-input" min="0" value="${book?.currentPage || 0}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Total de Páginas</label>
+            <input type="number" id="book-total-pages" class="form-input" min="1" value="${book?.totalPages || ''}">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Avaliação</label>
+          <div class="rating-input" id="book-rating">
+            ${[1,2,3,4,5].map(i => `<span class="star material-icons" data-rating="${i}">star</span>`).join('')}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Resenha Pessoal</label>
+          <textarea id="book-review" class="form-input" rows="3" placeholder="Suas impressões sobre o livro...">${book?.review || ''}</textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Tópicos Relacionados</label>
+          <div class="topics-selector" id="book-topics-selector">
+            ${this.renderTopicsCheckboxes(book?.relatedTopicIds)}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">URL da Capa</label>
+          <input type="url" id="book-cover" class="form-input" value="${book?.coverUrl || ''}">
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">
+            <span class="btn-text">Salvar</span>
+            <span class="btn-loading hidden">Salvando...</span>
+          </button>
+          <button type="button" id="cancel-book" class="btn btn-secondary">Cancelar</button>
+        </div>
+      </form>
+    `;
+
+    window.app.modalManager.show({
+      title,
+      content,
+      onMount: (modalElement) => {
+        modalElement.querySelector('#book-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          this.handleFormSubmit(modalElement);
+        });
+
+        modalElement.querySelector('#cancel-book').addEventListener('click', () => {
+          window.app.modalManager.hide();
+        });
+
+        modalElement.querySelector('#search-isbn').addEventListener('click', () => {
+          this.searchByISBN(modalElement);
+        });
+
+        modalElement.querySelectorAll('#book-rating .star').forEach(star => {
+          star.addEventListener('click', (e) => {
+            this.setRating(parseInt(e.target.dataset.rating, 10), modalElement);
+          });
+        });
+
+        if (book?.rating) {
+          this.setRating(book.rating, modalElement);
+        }
+      }
+    });
+  }
+
+  async searchByISBN(modalElement) {
+    const isbn = modalElement.querySelector('#book-isbn').value.trim();
     if (!isbn) return;
 
     try {
@@ -297,10 +303,10 @@ export class BooksModule {
       if (data.items && data.items.length > 0) {
         const book = data.items[0].volumeInfo;
 
-        document.getElementById('book-title').value = book.title || '';
-        document.getElementById('book-author').value = book.authors?.join(', ') || '';
-        document.getElementById('book-total-pages').value = book.pageCount || '';
-        document.getElementById('book-cover').value = book.imageLinks?.thumbnail || '';
+        modalElement.querySelector('#book-title').value = book.title || '';
+        modalElement.querySelector('#book-author').value = book.authors?.join(', ') || '';
+        modalElement.querySelector('#book-total-pages').value = book.pageCount || '';
+        modalElement.querySelector('#book-cover').value = book.imageLinks?.thumbnail || '';
       } else {
         alert('Livro não encontrado. Preencha os dados manualmente.');
       }
@@ -310,24 +316,15 @@ export class BooksModule {
     }
   }
 
-  setRating(rating) {
-    document.querySelectorAll('#book-rating .star').forEach((star, index) => {
+  setRating(rating, modalElement) {
+    modalElement.querySelectorAll('#book-rating .star').forEach((star, index) => {
       star.style.opacity = index < rating ? '1' : '0.3';
     });
     this.selectedRating = rating;
   }
 
-  showModal() {
-    document.getElementById('book-modal').classList.remove('hidden');
-    this.clearForm();
-  }
-
-  hideModal() {
-    document.getElementById('book-modal').classList.add('hidden');
-  }
-
-  async handleFormSubmit(firestoreService) {
-    const submitBtn = document.querySelector('#book-form button[type="submit"]');
+  async handleFormSubmit(modalElement) {
+    const submitBtn = modalElement.querySelector('#book-form button[type="submit"]');
     const btnText = submitBtn.querySelector('.btn-text');
     const btnLoading = submitBtn.querySelector('.btn-loading');
     
@@ -337,22 +334,28 @@ export class BooksModule {
     btnLoading.classList.remove('hidden');
 
     try {
-      const bookId = document.getElementById('book-id').value;
-      const title = document.getElementById('book-title').value.trim();
-      const author = document.getElementById('book-author').value.trim();
-      const status = document.getElementById('book-status').value;
-      const currentPage = parseInt(document.getElementById('book-current-page').value) || 0;
-      const totalPages = parseInt(document.getElementById('book-total-pages').value) || 0;
-      const coverUrl = document.getElementById('book-cover').value.trim();
-      const review = document.getElementById('book-review').value.trim();
+      const firestoreService = window.app.firestoreService;
+      const bookId = modalElement.querySelector('#book-id').value;
+      const title = modalElement.querySelector('#book-title').value.trim();
+      const author = modalElement.querySelector('#book-author').value.trim();
+      const status = modalElement.querySelector('#book-status').value;
+      const currentPage = parseInt(modalElement.querySelector('#book-current-page').value) || 0;
+      const totalPages = parseInt(modalElement.querySelector('#book-total-pages').value) || 0;
+      const coverUrl = modalElement.querySelector('#book-cover').value.trim();
+      const review = modalElement.querySelector('#book-review').value.trim();
 
       // Get selected topics
       const selectedTopics = [];
-      document.querySelectorAll('#book-topics-selector input[type="checkbox"]:checked').forEach(checkbox => {
+      modalElement.querySelectorAll('#book-topics-selector input[type="checkbox"]:checked').forEach(checkbox => {
         selectedTopics.push(checkbox.value);
       });
 
-      if (!title || !author) return;
+      if (!title || !author) {
+        submitBtn.disabled = false;
+        btnText.classList.remove('hidden');
+        btnLoading.classList.add('hidden');
+        return;
+      };
 
       const bookData = {
         title,
@@ -372,7 +375,7 @@ export class BooksModule {
         await firestoreService.createDocument('books', bookData);
       }
 
-      this.hideModal();
+      window.app.modalManager.hide();
       // Use new refresh method instead of full navigation
       await window.app.refreshDataAndReRender('books');
     } catch (error) {
