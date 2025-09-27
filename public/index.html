@@ -62,6 +62,7 @@
     <link rel="stylesheet" href="dashboard.css">
     <link rel="stylesheet" href="topics.css">
     <link rel="stylesheet" href="books.css">
+    <link rel="stylesheet" href="articles.css">
     <link rel="stylesheet" href="notes.css">
     <link rel="stylesheet" href="focus.css">
     <link rel="stylesheet" href="priorities.css">
@@ -95,6 +96,7 @@
                 <li><a href="#dashboard" class="nav-link active" data-section="dashboard">Dashboard</a></li>
                 <li><a href="#topics" class="nav-link" data-section="topics">Tópicos</a></li>
                 <li><a href="#books" class="nav-link" data-section="books">Livros</a></li>
+                <li><a href="#articles" class="nav-link" data-section="articles">Artigos/Vídeos</a></li>
                 <li><a href="#priorities" class="nav-link" data-section="priorities">Prioridades</a></li>
             </ul>
             <div class="nav-user">
@@ -122,7 +124,8 @@
             </div>
           </div>
           <div class="session-controls">
-            <button id="session-music-btn" class="btn-session-control" title="Música"><span class="material-icons">music_note</span></button>
+            <button id="session-music-btn" class="btn-session-control" title="Configurar Música"><span class="material-icons">music_note</span></button>
+            <button id="session-music-toggle-btn" class="btn-session-control" title="Pausar/Retomar Música" style="display: none;"><span class="material-icons">volume_up</span></button>
             <button id="session-pause-btn" class="btn-session-control" title="Pausar/Continuar"><span class="material-icons">pause</span></button>
             <button id="session-stop-btn" class="btn-session-control" title="Finalizar"><span class="material-icons">stop</span></button>
             <button id="session-maximize-btn" class="btn-session-control" title="Maximizar"><span class="material-icons">open_in_full</span></button>

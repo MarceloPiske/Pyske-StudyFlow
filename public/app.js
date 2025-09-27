@@ -6,17 +6,14 @@ import {
   onAuthStateChanged 
 } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js';
 
-import { 
-  collection, 
-  addDoc 
-} from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
-
-// Import modules
+// Import page components
 import { DashboardModule } from './modules/dashboard.js';
-import { TopicsModule } from './modules/topics.js';
+import { TopicPage } from './components/topics/TopicPage.js';
 import { BooksModule } from './modules/books.js';
+import { ArticlesModule } from './modules/articles.js';
 import { PrioritiesModule } from './modules/priorities.js';
 import { FirestoreService } from './services/firestore-service.js';
+import { SessionManager } from './services/session-manager.js';
 
 class App {
   constructor() {
@@ -26,6 +23,7 @@ class App {
     
     this.user = null;
     this.currentSection = 'dashboard';
+    this.currentDetailId = null;
     
     // ===== CENTRALIZED STATE - SINGLE SOURCE OF TRUTH =====
     this.allTopics = [];
@@ -35,11 +33,11 @@ class App {
     this.firestoreService = null;
     // ======================================================
     
-    // Centralized session management
-    this.activeSession = null; // { topicId, topicName, bookId, startTime, isPaused, intervalId, sessionType }
+    // Session management
+    this.sessionManager = null;
     
-    // Module instances
-    this.modules = {};
+    // Page components (new architecture)
+    this.pageComponents = {};
     
     // Initialize app
     this.init();
@@ -87,12 +85,16 @@ class App {
     // Initialize Firestore service
     this.firestoreService = new FirestoreService(this.db, this.user);
 
-    // Initialize modules (they no longer need db or user since they don't load data)
-    this.modules = {
-      dashboard: new DashboardModule(),
-      topics: new TopicsModule(),
-      books: new BooksModule(),
-      priorities: new PrioritiesModule()
+    // Initialize session manager
+    this.sessionManager = new SessionManager(this.db, this.user);
+
+    // Initialize page components (new architecture)
+    this.pageComponents = {
+      dashboard: new DashboardModule(), // Keep as module for now
+      topics: null, // Will be created dynamically with props
+      books: new BooksModule(), // Keep as module for now
+      articles: new ArticlesModule(), // Keep as module for now
+      priorities: new PrioritiesModule() // Keep as module for now
     };
 
     // Update user info
@@ -106,40 +108,40 @@ class App {
 
     // Setup event listeners
     this.setupAppEventListeners();
-    this.setupSessionPanelListeners();
     
     // Load initial section
     this.navigateToSection('dashboard');
   }
 
-  // NEW METHOD: Load all data once and store in central state
   async loadCentralizedData() {
     try {
-      const [topics, books, priorities] = await Promise.all([
+      const [topics, books, resources, priorities] = await Promise.all([
         this.firestoreService.getCollection('topics', 'name', 'asc'),
         this.firestoreService.getCollection('books', 'createdAt', 'desc'),
+        this.firestoreService.getCollection('resources', 'createdAt', 'desc'),
         this.firestoreService.getUserDocument('settings/priorities')
       ]);
       
       this.allTopics = topics;
       this.allBooks = books;
+      this.allResources = resources;
       this.priorityQueueIds = priorities?.queue || [];
       
       console.log("Central state loaded:", { 
         topics: this.allTopics.length, 
         books: this.allBooks.length,
+        resources: this.allResources.length,
         priorityQueue: this.priorityQueueIds.length
       });
     } catch (error) {
       console.error("Error loading central data:", error);
-      // Set empty arrays as fallback
       this.allTopics = [];
       this.allBooks = [];
+      this.allResources = [];
       this.priorityQueueIds = [];
     }
   }
 
-  // NEW METHOD: Refresh data after CRUD operations
   async refreshData(dataType = 'all') {
     try {
       if (dataType === 'all' || dataType === 'topics') {
@@ -147,6 +149,9 @@ class App {
       }
       if (dataType === 'all' || dataType === 'books') {
         this.allBooks = await this.firestoreService.getCollection('books', 'createdAt', 'desc');
+      }
+      if (dataType === 'all' || dataType === 'resources' || dataType === 'articles') {
+        this.allResources = await this.firestoreService.getCollection('resources', 'createdAt', 'desc');
       }
       if (dataType === 'all' || dataType === 'priorities') {
         const priorities = await this.firestoreService.getUserDocument('settings/priorities');
@@ -158,7 +163,16 @@ class App {
     }
   }
 
-  // NEW METHOD: Update priority queue
+  async refreshDataAndReRender(dataType = 'all') {
+    await this.refreshData(dataType);
+    
+    if (this.currentDetailId) {
+      await this.navigateToSection(this.currentSection, { detailId: this.currentDetailId });
+    } else {
+      await this.navigateToSection(this.currentSection);
+    }
+  }
+
   async updatePriorityQueue(queueIds) {
     try {
       this.priorityQueueIds = queueIds;
@@ -196,55 +210,6 @@ class App {
     }
   }
 
-  setupSessionPanelListeners() {
-    // Session controls
-    document.getElementById('session-pause-btn')?.addEventListener('click', () => {
-      this.toggleSessionPause();
-    });
-
-    document.getElementById('session-stop-btn')?.addEventListener('click', () => {
-      this.showSessionEndModal();
-    });
-
-    document.getElementById('session-maximize-btn')?.addEventListener('click', () => {
-      this.maximizeSession();
-    });
-
-    document.getElementById('session-music-btn')?.addEventListener('click', () => {
-      this.showSessionMusicModal();
-    });
-
-    // Session music modal
-    document.getElementById('close-music-modal')?.addEventListener('click', () => {
-      this.hideSessionMusicModal();
-    });
-
-    document.getElementById('session-load-video')?.addEventListener('click', () => {
-      this.loadSessionMusic();
-    });
-
-    // Music preset buttons
-    document.addEventListener('click', (e) => {
-      if (e.target.classList.contains('btn-preset')) {
-        const videoId = e.target.dataset.video;
-        this.loadSessionPreset(videoId);
-      }
-    });
-
-    // Session end modal
-    document.getElementById('save-session-btn')?.addEventListener('click', () => {
-      this.saveAndEndSession();
-    });
-
-    document.getElementById('discard-session-btn')?.addEventListener('click', () => {
-      this.discardSession();
-    });
-
-    document.getElementById('close-session-modal')?.addEventListener('click', () => {
-      this.hideSessionEndModal();
-    });
-  }
-
   async navigateToSection(sectionId, options = {}) {
     console.log(`Navigating to: ${sectionId}`, options);
     
@@ -259,74 +224,95 @@ class App {
     }
 
     this.currentSection = sectionId;
+    this.currentDetailId = options.detailId || null;
     const mainContent = document.getElementById('main-content');
     
     // Show loading state
     mainContent.innerHTML = '<div class="loading-container"><div class="loading-spinner"></div><p>Carregando...</p></div>';
 
     try {
-      const module = this.modules[sectionId];
-      if (!module) {
-        throw new Error(`Module ${sectionId} not found`);
+      let pageComponent;
+
+      // Create page component with props
+      switch (sectionId) {
+        case 'topics':
+          pageComponent = new TopicPage({
+            topics: this.allTopics,
+            firestoreService: this.firestoreService,
+            detailId: options.detailId
+          });
+          break;
+          
+        case 'dashboard':
+          pageComponent = this.pageComponents.dashboard;
+          break;
+          
+        case 'books':
+          pageComponent = this.pageComponents.books;
+          break;
+          
+        case 'articles':
+          pageComponent = this.pageComponents.articles;
+          break;
+          
+        case 'priorities':
+          pageComponent = this.pageComponents.priorities;
+          break;
+          
+        default:
+          throw new Error(`Section ${sectionId} not found`);
       }
 
-      let html;
-
-      // Handle detail view vs list view
-      if (options.detailId) {
-        // Render detail view - modules can still load specific documents
-        switch (sectionId) {
-          case 'topics':
-            html = await module.renderDetailView(options.detailId, this.firestoreService);
-            break;
-          case 'books':
-            html = await module.renderDetailView(options.detailId, this.allTopics, this.firestoreService);
-            break;
-          default:
-            html = await module.renderDetailView(options.detailId, this.firestoreService);
-        }
-        
-        // Initialize detail view listeners
-        if (module.initDetailViewListeners) {
-          setTimeout(() => module.initDetailViewListeners(this.firestoreService), 100);
-        }
+      // Handle new component architecture vs old module architecture
+      if (pageComponent && pageComponent.mount) {
+        // New component architecture
+        pageComponent.mount('#main-content');
       } else {
-        // Render list view - pass central data to modules
-        switch (sectionId) {
-          case 'dashboard':
-            html = await module.render(this.allTopics, this.allBooks, this.firestoreService);
-            break;
-            
-          case 'topics':
-            html = await module.renderListView(this.allTopics);
-            break;
-            
-          case 'books':
-            html = await module.render(this.allTopics, this.allBooks);
-            break;
+        // Old module architecture (for sections not yet refactored)
+        let html;
 
-          case 'priorities':
-            // Get priority queue topics from central state
-            const priorityQueueTopics = this.priorityQueueIds
-              .map(id => this.allTopics.find(t => t.id === id))
-              .filter(Boolean);
-            html = await module.render(this.allTopics, priorityQueueTopics, this.priorityQueueIds);
-            break;
-            
-          default:
-            html = await module.render();
+        if (options.detailId) {
+          switch (sectionId) {
+            case 'books':
+              html = await pageComponent.renderDetailView(options.detailId, this.allTopics, this.firestoreService);
+              break;
+            default:
+              html = await pageComponent.renderDetailView(options.detailId, this.firestoreService);
+          }
+          
+          if (pageComponent.initDetailViewListeners) {
+            setTimeout(() => pageComponent.initDetailViewListeners(this.firestoreService), 100);
+          }
+        } else {
+          switch (sectionId) {
+            case 'dashboard':
+              html = await pageComponent.render(this.allTopics, this.allBooks, this.firestoreService);
+              break;
+            case 'books':
+              html = await pageComponent.render(this.allTopics, this.allBooks);
+              break;
+            case 'articles':
+              html = await pageComponent.render(this.allTopics, this.allResources);
+              break;
+            case 'priorities':
+              const priorityQueueTopics = this.priorityQueueIds
+                .map(id => this.allTopics.find(t => t.id === id))
+                .filter(Boolean);
+              html = await pageComponent.render(this.allTopics, priorityQueueTopics, this.priorityQueueIds);
+              break;
+            default:
+              html = await pageComponent.render();
+          }
+
+          if (pageComponent.initListViewListeners) {
+            setTimeout(() => pageComponent.initListViewListeners(this.firestoreService), 100);
+          } else if (pageComponent.init) {
+            setTimeout(() => pageComponent.init(this.firestoreService), 100);
+          }
         }
 
-        // Initialize list view listeners
-        if (module.initListViewListeners) {
-          setTimeout(() => module.initListViewListeners(this.firestoreService), 100);
-        } else if (module.init) {
-          setTimeout(() => module.init(this.firestoreService), 100);
-        }
+        mainContent.innerHTML = html;
       }
-
-      // Render content
-      mainContent.innerHTML = html;
 
     } catch (error) {
       console.error(`Error loading section ${sectionId}:`, error);
@@ -344,187 +330,21 @@ class App {
     }
   }
 
-  // Centralized Session Management Methods
+  // Session Management Methods (delegated to SessionManager)
   startStudySession(topicId, topicName, bookId = null, sessionType = 'study') {
-    if (this.activeSession) {
-      if (!confirm('Já existe uma sessão ativa. Deseja finalizar a sessão atual e iniciar uma nova?')) {
-        return;
-      }
-      this.discardSession();
-    }
-
-    this.activeSession = {
-      topicId,
-      topicName,
-      bookId,
-      sessionType,
-      startTime: new Date(),
-      isPaused: false,
-      intervalId: null,
-      totalPausedTime: 0,
-      lastPauseTime: null
-    };
-
-    this.showSessionPanel();
-    this.startSessionTimer();
-    
-    console.log('Started study session:', this.activeSession);
-  }
-
-  showSessionPanel() {
-    const panel = document.getElementById('active-session-panel');
-    const topicName = document.getElementById('session-topic-name');
-    
-    if (topicName && this.activeSession) {
-      topicName.textContent = this.activeSession.topicName;
-    }
-    panel?.classList.remove('hidden');
-  }
-
-  hideSessionPanel() {
-    document.getElementById('active-session-panel')?.classList.add('hidden');
-  }
-
-  startSessionTimer() {
-    if (this.activeSession?.intervalId) {
-      clearInterval(this.activeSession.intervalId);
-    }
-
-    this.activeSession.intervalId = setInterval(() => {
-      this.updateSessionDisplay();
-    }, 1000);
-  }
-
-  updateSessionDisplay() {
-    if (!this.activeSession || this.activeSession.isPaused) return;
-
-    const now = new Date();
-    const elapsed = now.getTime() - this.activeSession.startTime.getTime() - this.activeSession.totalPausedTime;
-    const seconds = Math.floor(elapsed / 1000);
-    
-    const display = document.getElementById('session-elapsed-time');
-    if (display) {
-      display.textContent = this.formatTime(seconds);
-    }
-  }
-
-  toggleSessionPause() {
-    if (!this.activeSession) return;
-
-    const pauseBtn = document.getElementById('session-pause-btn');
-    
-    if (this.activeSession.isPaused) {
-      // Resume
-      const pauseDuration = new Date().getTime() - this.activeSession.lastPauseTime.getTime();
-      this.activeSession.totalPausedTime += pauseDuration;
-      this.activeSession.isPaused = false;
-      this.activeSession.lastPauseTime = null;
-      this.startSessionTimer();
-      if (pauseBtn) pauseBtn.innerHTML = '<span class="material-icons">pause</span>';
-    } else {
-      // Pause
-      this.activeSession.isPaused = true;
-      this.activeSession.lastPauseTime = new Date();
-      if (this.activeSession.intervalId) {
-        clearInterval(this.activeSession.intervalId);
-      }
-      if (pauseBtn) pauseBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
-    }
-  }
-
-  showSessionEndModal() {
-    if (!this.activeSession) return;
-
-    const modal = document.getElementById('session-notes-modal');
-    const topicName = document.getElementById('summary-topic-name');
-    const duration = document.getElementById('summary-duration');
-    
-    const elapsed = this.getSessionDuration();
-    const minutes = Math.floor(elapsed / 60000);
-    
-    if (topicName) topicName.textContent = this.activeSession.topicName;
-    if (duration) duration.textContent = `${minutes} minutos`;
-    
-    modal?.classList.remove('hidden');
-  }
-
-  hideSessionEndModal() {
-    document.getElementById('session-notes-modal')?.classList.add('hidden');
-  }
-
-  getSessionDuration() {
-    if (!this.activeSession) return 0;
-    
-    const now = new Date();
-    let elapsed = now.getTime() - this.activeSession.startTime.getTime() - this.activeSession.totalPausedTime;
-    
-    // If currently paused, don't count the current pause
-    if (this.activeSession.isPaused && this.activeSession.lastPauseTime) {
-      // The elapsed time is already correct since we don't update totalPausedTime until resume
+    if (this._startingSession) {
+      console.log('Session start already in progress, ignoring duplicate call');
+      return;
     }
     
-    return elapsed;
-  }
-
-  async saveAndEndSession() {
-    if (!this.activeSession) return;
-
+    this._startingSession = true;
+    
     try {
-      const notes = document.getElementById('session-quick-notes')?.value.trim() || '';
-      const elapsed = this.getSessionDuration();
-      const durationInSeconds = Math.floor(elapsed / 1000);
-
-      const sessionData = {
-        userId: this.user.uid,
-        topicId: this.activeSession.topicId,
-        topicName: this.activeSession.topicName,
-        bookId: this.activeSession.bookId || null,
-        durationInSeconds,
-        notes: notes || null,
-        sessionType: this.activeSession.sessionType || 'study',
-        createdAt: new Date()
-      };
-
-      await addDoc(collection(this.db, 'studySessions'), sessionData);
-      
-      this.endSession();
-      alert('Sessão salva com sucesso!');
-      
-      // Refresh dashboard data if on dashboard
-      if (this.currentSection === 'dashboard') {
-        this.navigateToSection('dashboard');
-      }
-    } catch (error) {
-      console.error('Error saving session:', error);
-      alert('Erro ao salvar sessão. Tente novamente.');
-    }
-  }
-
-  discardSession() {
-    this.endSession();
-  }
-
-  endSession() {
-    if (this.activeSession?.intervalId) {
-      clearInterval(this.activeSession.intervalId);
-    }
-    
-    this.activeSession = null;
-    this.hideSessionPanel();
-    this.hideSessionEndModal();
-    
-    // Clear quick notes
-    const notesField = document.getElementById('session-quick-notes');
-    if (notesField) notesField.value = '';
-  }
-
-  maximizeSession() {
-    if (!this.activeSession) return;
-
-    if (this.activeSession.bookId) {
-      this.navigateToSection('books', { detailId: this.activeSession.bookId });
-    } else {
-      this.navigateToSection('topics', { detailId: this.activeSession.topicId });
+      this.sessionManager.startSession(topicId, topicName, bookId, sessionType);
+    } finally {
+      setTimeout(() => {
+        this._startingSession = false;
+      }, 1000);
     }
   }
 
@@ -544,21 +364,13 @@ class App {
 
   async logout() {
     try {
-      if (this.activeSession) {
-        this.discardSession();
+      if (this.sessionManager?.hasActiveSession()) {
+        this.sessionManager.discardSession();
       }
       await signOut(this.auth);
     } catch (error) {
       console.error('Logout error:', error);
     }
-  }
-
-  // Utility methods
-  formatTime(seconds) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
   static formatDate(date) {
@@ -577,43 +389,6 @@ class App {
       hour: '2-digit',
       minute: '2-digit'
     }).format(date);
-  }
-
-  showSessionMusicModal() {
-    document.getElementById('session-music-modal')?.classList.remove('hidden');
-  }
-
-  hideSessionMusicModal() {
-    document.getElementById('session-music-modal')?.classList.add('hidden');
-  }
-
-  loadSessionMusic() {
-    const url = document.getElementById('session-youtube-link').value.trim();
-    if (!url) return;
-
-    const videoId = this.extractVideoId(url);
-    if (!videoId) {
-      alert('URL do YouTube inválida. Tente novamente.');
-      return;
-    }
-
-    this.loadSessionVideo(videoId);
-  }
-
-  loadSessionPreset(videoId) {
-    this.loadSessionVideo(videoId);
-  }
-
-  loadSessionVideo(videoId) {
-    const iframe = document.getElementById('session-youtube-iframe');
-    iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=1&loop=1&playlist=${videoId}`;
-    document.getElementById('session-video-container').style.display = 'block';
-  }
-
-  extractVideoId(url) {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return match && match[2].length === 11 ? match[2] : null;
   }
 }
 

@@ -162,6 +162,41 @@
   font-weight: bold;
 }
 
+.topic-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.topic-level-indicator {
+  font-size: 0.75rem;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.topic-hierarchy-path {
+  margin-bottom: 6px;
+}
+
+.hierarchy-path {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.children-count {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 2px 0;
+  border-top: 1px solid var(--border-color);
+  margin-top: 4px;
+}
+
 /* Priority Queue */
 .priority-queue-header {
   display: flex;
@@ -197,6 +232,68 @@
 .priority-queue.drag-over {
   border-color: var(--accent-color);
   background: rgba(0, 123, 255, 0.05);
+}
+
+.empty-queue {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+}
+
+.empty-queue p:first-child {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  margin-bottom: 0.75rem;
+  transition: var(--transition);
+}
+
+.queue-item:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.queue-position {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 60px;
+}
+
+.position-number {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--accent-color);
+}
+
+.priority-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.queue-item:first-child .queue-position {
+  background: linear-gradient(135deg, var(--accent-color), var(--accent-color-dark));
+  color: white;
+  border-radius: 8px;
+  padding: 4px;
+  margin-right: 8px;
+}
+
+.queue-item:first-child .position-number,
+.queue-item:first-child .priority-label {
+  color: white;
 }
 
 .empty-queue {

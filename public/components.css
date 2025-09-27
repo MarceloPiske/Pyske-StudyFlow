@@ -38,6 +38,7 @@
 
 /* Buttons */
 .btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -58,6 +59,18 @@
   opacity: 0.6;
   cursor: not-allowed;
   transform: none !important;
+}
+
+.btn-loading {
+  display: none;
+}
+
+.btn .btn-loading:not(.hidden) {
+  display: inline;
+}
+
+.btn .btn-text.hidden {
+  display: none;
 }
 
 .btn-primary {
@@ -349,4 +362,167 @@ textarea.form-input {
   .modal-header h2 {
     font-size: 1.25rem;
   }
+}
+
+/* Enhanced Book Detail Styles */
+.book-detail-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.book-tabs {
+  margin-top: 2rem;
+}
+
+.book-cover-large {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.book-cover-large img {
+  max-width: 200px;
+  height: auto;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.book-details p {
+  margin: 0.5rem 0;
+}
+
+.progress-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.progress-visual {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.progress-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: conic-gradient(var(--accent-color) 0deg, var(--secondary-color) 0deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.progress-circle::before {
+  content: '';
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: white;
+  position: absolute;
+}
+
+.progress-percentage {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent-color);
+  z-index: 1;
+}
+
+.progress-details {
+  flex: 1;
+}
+
+.progress-details p {
+  margin: 0.5rem 0;
+  font-size: 1rem;
+}
+
+.progress-update {
+  padding: 1.5rem;
+  background: var(--secondary-color);
+  border-radius: var(--radius);
+}
+
+.progress-update h4 {
+  margin-bottom: 1rem;
+}
+
+.notes-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.notes-editor {
+  margin-top: 1rem;
+}
+
+.related-topics-container {
+  max-width: 100%;
+}
+
+.topics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.topic-card {
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background: white;
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+.topic-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: var(--accent-color);
+}
+
+.topic-card h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+}
+
+.topic-meta {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Enhanced Drag and Drop Feedback */
+.draggable-topic.dragging {
+  opacity: 0.6;
+  transform: scale(0.95);
+  box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3);
+  border: 2px dashed var(--accent-color);
+}
+
+.topic-item.drag-over {
+  background: rgba(0, 123, 255, 0.1);
+  border-color: var(--accent-color);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.2);
+}
+
+.topic-item.drag-over::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 2px dashed var(--accent-color);
+  border-radius: var(--radius);
+  pointer-events: none;
+  animation: dragPulse 1s ease-in-out infinite;
+}
+
+@keyframes dragPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }

@@ -1,13 +1,26 @@
+import { BookDetailView } from './book-detail-view.js';
+
 export class BooksModule {
   constructor() {
     this.books = [];
     this.relatedTopics = [];
+    this.detailView = new BookDetailView();
   }
 
+  // Main render method for list view
   async render(topicsData = [], booksData = []) {
     this.relatedTopics = topicsData;
     this.books = booksData;
 
+    return this.renderListView();
+  }
+
+  // Render detail view for a specific book
+  async renderDetailView(bookId, allTopics, firestoreService) {
+    return await this.detailView.render(bookId, allTopics, firestoreService);
+  }
+
+  renderListView() {
     return `
       <div class="books-container">
         <div class="books-header">
@@ -102,7 +115,10 @@ export class BooksModule {
                 </div>
 
                 <div class="form-actions">
-                  <button type="submit" class="btn btn-primary">Salvar</button>
+                  <button type="submit" class="btn btn-primary">
+                    <span class="btn-text">Salvar</span>
+                    <span class="btn-loading hidden">Salvando...</span>
+                  </button>
                   <button type="button" id="cancel-book" class="btn btn-secondary">Cancelar</button>
                 </div>
               </form>
@@ -111,10 +127,6 @@ export class BooksModule {
         </div>
       </div>
     `;
-  }
-
-  getTopicById(topicId) {
-    return this.relatedTopics?.find(t => t.id === topicId);
   }
 
   renderBooks(filter = 'all') {
@@ -141,7 +153,7 @@ export class BooksModule {
           <img src="${book.coverUrl || '/placeholder-book.png'}" alt="Capa de ${book.title}" loading="lazy">
         </div>
         <div class="card-body">
-          <h3 class="book-title">${book.title}</h3>
+          <h3 class="book-title" data-book-id="${book.id}">${book.title}</h3>
           <p class="book-author">${book.author}</p>
           <div class="book-status ${book.status}">${statusLabels[book.status]}</div>
 
@@ -180,6 +192,10 @@ export class BooksModule {
     `;
   }
 
+  getTopicById(topicId) {
+    return this.relatedTopics?.find(t => t.id === topicId);
+  }
+
   renderTopicsCheckboxes() {
     if (!this.relatedTopics?.length) {
       return '<p class="empty-state">Crie alguns tópicos primeiro para relacioná-los aos livros.</p>';
@@ -193,8 +209,14 @@ export class BooksModule {
     `).join('');
   }
 
-  init(firestoreService) {
+  // Initialize list view listeners
+  initListViewListeners(firestoreService) {
     this.setupEventListeners(firestoreService);
+  }
+
+  // Initialize detail view listeners
+  initDetailViewListeners(firestoreService) {
+    this.detailView.setupListeners(firestoreService);
   }
 
   setupEventListeners(firestoreService) {
@@ -256,7 +278,10 @@ export class BooksModule {
         this.startStudySession(bookId, bookTitle);
       } else if (e.target.classList.contains('topic-tag')) {
         const topicId = e.target.dataset.topicId;
-        window.app.navigateToSection('topics', { highlightTopic: topicId });
+        window.app.navigateToSection('topics', { detailId: topicId });
+      } else if (e.target.classList.contains('book-title')) {
+        const bookId = e.target.dataset.bookId;
+        window.app.navigateToSection('books', { detailId: bookId });
       }
     });
   }
@@ -302,24 +327,33 @@ export class BooksModule {
   }
 
   async handleFormSubmit(firestoreService) {
-    const bookId = document.getElementById('book-id').value;
-    const title = document.getElementById('book-title').value.trim();
-    const author = document.getElementById('book-author').value.trim();
-    const status = document.getElementById('book-status').value;
-    const currentPage = parseInt(document.getElementById('book-current-page').value) || 0;
-    const totalPages = parseInt(document.getElementById('book-total-pages').value) || 0;
-    const coverUrl = document.getElementById('book-cover').value.trim();
-    const review = document.getElementById('book-review').value.trim();
-
-    // Get selected topics
-    const selectedTopics = [];
-    document.querySelectorAll('#book-topics-selector input[type="checkbox"]:checked').forEach(checkbox => {
-      selectedTopics.push(checkbox.value);
-    });
-
-    if (!title || !author) return;
+    const submitBtn = document.querySelector('#book-form button[type="submit"]');
+    const btnText = submitBtn.querySelector('.btn-text');
+    const btnLoading = submitBtn.querySelector('.btn-loading');
+    
+    // Show loading state
+    submitBtn.disabled = true;
+    btnText.classList.add('hidden');
+    btnLoading.classList.remove('hidden');
 
     try {
+      const bookId = document.getElementById('book-id').value;
+      const title = document.getElementById('book-title').value.trim();
+      const author = document.getElementById('book-author').value.trim();
+      const status = document.getElementById('book-status').value;
+      const currentPage = parseInt(document.getElementById('book-current-page').value) || 0;
+      const totalPages = parseInt(document.getElementById('book-total-pages').value) || 0;
+      const coverUrl = document.getElementById('book-cover').value.trim();
+      const review = document.getElementById('book-review').value.trim();
+
+      // Get selected topics
+      const selectedTopics = [];
+      document.querySelectorAll('#book-topics-selector input[type="checkbox"]:checked').forEach(checkbox => {
+        selectedTopics.push(checkbox.value);
+      });
+
+      if (!title || !author) return;
+
       const bookData = {
         title,
         author,
@@ -339,11 +373,16 @@ export class BooksModule {
       }
 
       this.hideModal();
-      // Refresh central data and reload books
-      await window.app.refreshData('books');
-      window.app.navigateToSection('books');
+      // Use new refresh method instead of full navigation
+      await window.app.refreshDataAndReRender('books');
     } catch (error) {
       console.error('Error saving book:', error);
+      alert('Erro ao salvar livro. Tente novamente.');
+    } finally {
+      // Reset button state
+      submitBtn.disabled = false;
+      btnText.classList.remove('hidden');
+      btnLoading.classList.add('hidden');
     }
   }
 
@@ -377,11 +416,11 @@ export class BooksModule {
 
     try {
       await firestoreService.deleteDocument('books', bookId);
-      // Refresh central data and reload books
-      await window.app.refreshData('books');
-      window.app.navigateToSection('books');
+      // Use new refresh method instead of full navigation
+      await window.app.refreshDataAndReRender('books');
     } catch (error) {
       console.error('Error deleting book:', error);
+      alert('Erro ao excluir livro. Tente novamente.');
     }
   }
 

@@ -1,4 +1,3 @@
-
 export class FocusSessionUI {
   constructor(resourcesManager) {
     this.resourcesManager = resourcesManager;
@@ -8,10 +7,37 @@ export class FocusSessionUI {
     this.topic = topic;
     return `
       <div class="focus-session-container">
+        <div class="study-preparation">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Preparação para o Estudo</h3>
+            </div>
+            <div class="card-body">
+              <div class="quick-actions-grid">
+                <div class="quick-action-card" onclick="window.app.navigateToSection('books')">
+                  <span class="material-icons quick-action-icon">library_books</span>
+                  <div class="quick-action-title">Adicionar Livro</div>
+                  <div class="quick-action-desc">Cadastre livros relacionados ao tópico</div>
+                </div>
+                <div class="quick-action-card" onclick="document.getElementById('add-resource-btn')?.click()">
+                  <span class="material-icons quick-action-icon">article</span>
+                  <div class="quick-action-title">Adicionar Artigo</div>
+                  <div class="quick-action-desc">Salve artigos e materiais de apoio</div>
+                </div>
+                <div class="quick-action-card" onclick="document.getElementById('youtube-link')?.focus()">
+                  <span class="material-icons quick-action-icon">smart_display</span>
+                  <div class="quick-action-title">Adicionar Vídeo</div>
+                  <div class="quick-action-desc">Configure vídeos para assistir</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="grid grid-2">
           <div class="card">
             <div class="card-header">
-              <h3 class="card-title">Ferramentas de Estudo</h3>
+              <h3 class="card-title">Configuração do Ambiente</h3>
             </div>
             <div class="card-body">
               <div class="focus-tools">
@@ -34,6 +60,18 @@ export class FocusSessionUI {
                     <button class="btn-preset" data-video="5qap5aO4i9A">Chuva</button>
                     <button class="btn-preset" data-video="4xDzrJKXOOY">Piano</button>
                     <button class="btn-preset" data-video="hHW1oY26kxQ">Natureza</button>
+                  </div>
+                </div>
+
+                <div class="timer-settings">
+                  <div class="form-group">
+                    <label class="form-label">Duração da Sessão (minutos)</label>
+                    <select id="session-duration" class="form-input">
+                      <option value="25">25 min (Pomodoro)</option>
+                      <option value="45">45 min</option>
+                      <option value="60">60 min</option>
+                      <option value="90">90 min</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -102,7 +140,7 @@ export class FocusSessionUI {
   }
 
   extractVideoId(url) {
-    const regExp = "/^.*(youtu.be\\/|v\\/|u\\/\\w\\/|embed\\/|watch\\?v=|&v=)([^#&?]*).*/";
+    const regExp = "/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/";
     const match = url.match(regExp);
     return match && match[2].length === 11 ? match[2] : null;
   }

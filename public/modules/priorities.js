@@ -94,26 +94,53 @@ export class PrioritiesModule {
       <ul class="tree-list" style="margin-left: ${level * 15}px;">
         ${topics.map(topic => {
           const isInQueue = this.priorityQueueIds.includes(topic.id);
+          const children = this.getChildTopics(topic.id);
+          const hasChildren = children.length > 0;
+          
           return `
             <li class="tree-item">
               <div class="topic-item draggable-topic ${isInQueue ? 'in-queue' : ''}" 
                    data-topic-id="${topic.id}" 
                    draggable="true">
                 <div class="topic-content">
-                  <span class="topic-name">${topic.name}</span>
+                  <div class="topic-header">
+                    <span class="topic-name">${topic.name}</span>
+                    <span class="topic-level-indicator">Nível ${level + 1}</span>
+                  </div>
+                  <div class="topic-hierarchy-path">
+                    ${this.getTopicPath(topic.id)}
+                  </div>
                   <div class="topic-badges">
                     ${BadgeRenderer.renderStatusBadge(topic.status)}
                     ${BadgeRenderer.renderPriorityBadge(topic.priority)}
                     ${isInQueue ? '<span class="topic-badge in-queue"><span class="material-icons small">center_focus_strong</span> Na Fila</span>' : ''}
                   </div>
                 </div>
+                ${hasChildren ? `<div class="children-count">${children.length} subtópico${children.length > 1 ? 's' : ''}</div>` : ''}
               </div>
-              ${this.buildTreeHTML(this.getChildTopics(topic.id), level + 1)}
+              ${hasChildren ? this.buildTreeHTML(children, level + 1) : ''}
             </li>
           `;
         }).join('')}
       </ul>
     `;
+  }
+
+  getTopicPath(topicId) {
+    const path = [];
+    let currentTopic = this.topics.find(t => t.id === topicId);
+    
+    while (currentTopic && currentTopic.parentId) {
+      const parent = this.topics.find(t => t.id === currentTopic.parentId);
+      if (parent) {
+        path.unshift(parent.name);
+        currentTopic = parent;
+      } else {
+        break;
+      }
+    }
+    
+    return path.length > 0 ? `<span class="hierarchy-path">${path.join(' → ')}</span>` : '';
   }
 
   getChildTopics(parentId) {
@@ -136,9 +163,15 @@ export class PrioritiesModule {
 
       return `
         <div class="queue-item" data-topic-id="${topicId}" data-queue-index="${index}">
-          <div class="queue-position">#${index + 1}</div>
+          <div class="queue-position">
+            <span class="position-number">#${index + 1}</span>
+            <span class="priority-label">${index === 0 ? 'Próximo' : 'Fila'}</span>
+          </div>
           <div class="queue-topic-content">
             <div class="queue-topic-name">${topic.name}</div>
+            <div class="topic-hierarchy-path">
+              ${this.getTopicPath(topic.id)}
+            </div>
             <div class="queue-topic-meta">
               ${BadgeRenderer.renderStatusBadge(topic.status)}
               ${BadgeRenderer.renderPriorityBadge(topic.priority)}
@@ -146,9 +179,15 @@ export class PrioritiesModule {
             </div>
           </div>
           <div class="queue-actions">
-            <button class="btn-queue-up" data-topic-id="${topicId}" ${index === 0 ? 'disabled' : ''}><span class="material-icons small">keyboard_arrow_up</span></button>
-            <button class="btn-queue-down" data-topic-id="${topicId}" ${index === this.priorityQueueIds.length - 1 ? 'disabled' : ''}><span class="material-icons small">keyboard_arrow_down</span></button>
-            <button class="btn-queue-remove" data-topic-id="${topicId}"><span class="material-icons small">close</span></button>
+            <button class="btn-queue-up" data-topic-id="${topicId}" ${index === 0 ? 'disabled' : ''} title="Mover para cima">
+              <span class="material-icons small">keyboard_arrow_up</span>
+            </button>
+            <button class="btn-queue-down" data-topic-id="${topicId}" ${index === this.priorityQueueIds.length - 1 ? 'disabled' : ''} title="Mover para baixo">
+              <span class="material-icons small">keyboard_arrow_down</span>
+            </button>
+            <button class="btn-queue-remove" data-topic-id="${topicId}" title="Remover da fila">
+              <span class="material-icons small">close</span>
+            </button>
           </div>
         </div>
       `;

@@ -1,4 +1,3 @@
-
 import { UIUtils } from '../utils/ui-utils.js';
 import { DateUtils } from '../utils/date-utils.js';
 import { FormBuilder } from '../components/form-builder.js';
@@ -218,27 +217,41 @@ export class ResourcesManager {
   }
 
   async handleSubmit(firestoreService) {
-    const resourceId = document.getElementById('resource-id').value;
-    const topicId = document.getElementById('resource-topic-id').value;
-
-    const type = document.getElementById('resource-type').value;
-    const title = document.getElementById('resource-title').value.trim();
-    const source = document.getElementById('resource-source').value.trim();
-    const summary = document.getElementById('resource-summary').value.trim();
+    const submitBtn = document.querySelector('#resource-form button[type="submit"]');
+    const btnText = submitBtn.querySelector('.btn-text') || submitBtn;
+    const btnLoading = submitBtn.querySelector('.btn-loading');
     
-    let content;
-    if (type === 'internal_note') {
-      content = document.getElementById('note-editor').innerHTML;
+    // Show loading state if elements exist
+    if (btnLoading) {
+      submitBtn.disabled = true;
+      btnText.classList.add('hidden');
+      btnLoading.classList.remove('hidden');
     } else {
-      content = document.getElementById('resource-url').value;
-    }
-
-    if (!title || !content) {
-        alert('Título e Conteúdo/Link são obrigatórios.');
-        return;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Salvando...';
     }
 
     try {
+      const resourceId = document.getElementById('resource-id').value;
+      const topicId = document.getElementById('resource-topic-id').value;
+
+      const type = document.getElementById('resource-type').value;
+      const title = document.getElementById('resource-title').value.trim();
+      const source = document.getElementById('resource-source').value.trim();
+      const summary = document.getElementById('resource-summary').value.trim();
+      
+      let content;
+      if (type === 'internal_note') {
+        content = document.getElementById('note-editor').innerHTML;
+      } else {
+        content = document.getElementById('resource-url').value;
+      }
+
+      if (!title || !content) {
+          alert('Título e Conteúdo/Link são obrigatórios.');
+          return;
+      }
+
       const resourceData = {
         title: title,
         type: type,
@@ -257,10 +270,21 @@ export class ResourcesManager {
       }
 
       this.hideModal();
-      window.app.navigateToSection('topics', { detailId: topicId });
+      // Use new refresh method
+      await window.app.refreshDataAndReRender('topics');
     } catch (error) {
       console.error('Error saving resource:', error);
       alert('Erro ao salvar recurso.');
+    } finally {
+      // Reset button state
+      if (btnLoading) {
+        submitBtn.disabled = false;
+        btnText.classList.remove('hidden');
+        btnLoading.classList.add('hidden');
+      } else {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Salvar';
+      }
     }
   }
 
@@ -308,7 +332,8 @@ export class ResourcesManager {
 
     try {
       await firestoreService.deleteDocument('resources', resourceId);
-      window.app.navigateToSection('topics', { detailId: this.topic.id });
+      // Use new refresh method
+      await window.app.refreshDataAndReRender('topics');
     } catch (error) {
       console.error('Error deleting resource:', error);
       alert('Erro ao excluir recurso.');
